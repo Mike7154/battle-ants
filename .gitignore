@@ -1,0 +1,8 @@
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+
+# Local scratch/test files, if any ever land here
+*.tmp
+node_modules/

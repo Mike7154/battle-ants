@@ -1,0 +1,3277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Battle Ants</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --soil-900:#0f0c08; --soil-800:#17120c; --soil-700:#1e1811; --soil-600:#292018;
+    --line:#3a2f22; --line-soft:#2a2118;
+    --text:#ece1cf; --text-dim:#a7967f; --text-faint:#7a6c58;
+    --ant:#f5a623; --ant-glow:#ffc558; --ant-deep:#a5651a;
+    --bug:#9dcf3f; --bug-glow:#c3ec6a; --bug-deep:#5f7f21;
+    --gold:#ffd76a; --blood:#e0563b;
+    --font-display:"Bricolage Grotesque",system-ui,sans-serif;
+    --font-body:"Inter",system-ui,sans-serif;
+    --font-mono:"JetBrains Mono",ui-monospace,monospace;
+  }
+  * { box-sizing:border-box; }
+  html, body { height:100%; }
+  body {
+    margin:0; color:var(--text); font-family:var(--font-body);
+    background:radial-gradient(1200px 600px at 50% -10%,#241a12 0%,transparent 60%),var(--soil-900);
+    -webkit-font-smoothing:antialiased;
+    overflow:hidden;
+  }
+  .wrap { max-width:1180px; margin:0 auto; padding:18px 18px 0; height:100vh; display:flex; flex-direction:column; }
+
+  .top-zone { flex:0 0 auto; }
+
+  .scroll-zone {
+    flex:1 1 auto; min-height:0; overflow-y:auto; overflow-x:hidden;
+    padding-bottom:36px; margin-top:2px;
+    scrollbar-width:thin; scrollbar-color:var(--ant-deep) var(--soil-800);
+  }
+  .scroll-zone::-webkit-scrollbar { width:9px; }
+  .scroll-zone::-webkit-scrollbar-track { background:var(--soil-800); }
+  .scroll-zone::-webkit-scrollbar-thumb { background:var(--ant-deep); border-radius:6px; }
+  .scroll-zone::-webkit-scrollbar-thumb:hover { background:var(--ant); }
+
+  header.top { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:14px; }
+  header.top h1 { font-family:var(--font-display); font-weight:800; font-size:clamp(24px,4vw,38px); letter-spacing:-.02em; margin:0; }
+  header.top h1 .a{color:var(--ant);} header.top h1 .b{color:var(--bug);}
+
+  .hud { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .money {
+    font-family:var(--font-mono); font-weight:700; font-size:22px; color:var(--ant);
+    background:var(--soil-700); border:1px solid var(--line); border-radius:12px; padding:8px 16px;
+    transition:color .12s, border-color .12s, background .12s; min-width:120px; text-align:center;
+  }
+  .money.flash { color:#fff; background:#5a1d1d; border-color:var(--blood); }
+  .count { font-family:var(--font-mono); font-size:12px; color:var(--text-dim); }
+  .wavehud {
+    font-family:var(--font-mono); font-size:12px; font-weight:700; color:var(--bug-glow);
+    background:var(--soil-700); border:1px solid var(--line); border-radius:10px; padding:8px 13px;
+    letter-spacing:.04em;
+  }
+  .count .ca{color:var(--ant-glow);} .count .cb{color:var(--bug-glow);}
+  .btn {
+    font-family:var(--font-mono); font-size:12px; letter-spacing:.06em; color:var(--text);
+    background:var(--soil-600); border:1px solid var(--line); border-radius:10px; padding:9px 13px; cursor:pointer;
+    transition:transform .1s, border-color .12s, background .12s;
+  }
+  .btn:hover { border-color:var(--ant); }
+  .btn:active { transform:translateY(1px); }
+
+  /* battlefield */
+  .field-shell {
+    position:relative; border:1px solid var(--line); border-radius:16px; overflow:hidden;
+    background:
+      linear-gradient(90deg, rgba(157,207,63,.06), transparent 22%, transparent 78%, rgba(245,166,35,.06)),
+      repeating-linear-gradient(180deg, transparent 0 27px, rgba(255,255,255,.014) 27px 28px),
+      linear-gradient(180deg,#1b140d,#120d08);
+    box-shadow:inset 0 0 60px rgba(0,0,0,.5);
+  }
+  .field-shell svg { display:block; width:100%; height:auto; }
+  .zone-label {
+    position:absolute; top:8px; font-family:var(--font-mono); font-size:10px; letter-spacing:.2em;
+    text-transform:uppercase; color:var(--text-faint); pointer-events:none;
+  }
+  .zone-label.left{ left:12px; } .zone-label.right{ right:12px; }
+  .banner {
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-family:var(--font-display); font-weight:800; font-size:clamp(30px,7vw,72px);
+    letter-spacing:-.02em; pointer-events:none; opacity:0; transition:opacity .4s;
+  }
+  .banner.show { opacity:1; }
+  .banner.ant{ color:var(--ant); text-shadow:0 0 30px rgba(245,166,35,.6);}
+  .banner.bug{ color:var(--bug); text-shadow:0 0 30px rgba(157,207,63,.6);}
+
+  .hint { margin:10px 2px 20px; color:var(--text-faint); font-size:13px; font-family:var(--font-mono); }
+
+  /* panels */
+  .panel-head { display:flex; align-items:center; gap:12px; margin:22px 2px 12px; }
+  .panel-head .tag { font-family:var(--font-mono); font-size:12px; letter-spacing:.22em; text-transform:uppercase; }
+  .ants-panel .tag{color:var(--ant);} .bugs-panel .tag{color:var(--bug);}
+  .panel-head .sub { color:var(--text-faint); font-size:12.5px; }
+
+  .cards { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; }
+  @media (max-width:940px){ .cards{ grid-template-columns:repeat(3,1fr);} }
+  @media (max-width:600px){ .cards{ grid-template-columns:repeat(2,1fr);} }
+  #homeShop { grid-template-columns:repeat(5,1fr); }
+
+  .card {
+    background:linear-gradient(180deg,var(--soil-700),var(--soil-800));
+    border:1px solid var(--line); border-radius:13px; padding:12px 12px 10px; display:flex; flex-direction:column; gap:8px;
+  }
+  .ants-panel .card{ border-left:3px solid var(--ant-deep); }
+  .bugs-panel .card{ border-left:3px solid var(--bug-deep); }
+  .card.zombie{ border-left-color:var(--gold); }
+  .card .cname {
+    font-family:var(--font-display); font-weight:700; font-size:14.5px; line-height:1.15; min-height:33px;
+    max-height:33px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+  }
+  .card .cstats { font-family:var(--font-mono); font-size:11px; display:flex; gap:10px; }
+  .card .chp{color:var(--bug-glow);} .card .cdmg{color:var(--ant-glow);}
+  .card .cost { font-family:var(--font-mono); font-weight:700; font-size:12px; color:var(--ant); }
+  .card .cost.free{ color:var(--bug); }
+  .card .row { display:flex; gap:6px; align-items:stretch; }
+  .spawn {
+    flex:1; font-family:var(--font-mono); font-size:12px; font-weight:700; letter-spacing:.05em; color:#17120c;
+    background:var(--ant); border:none; border-radius:9px; padding:9px 6px; cursor:pointer; transition:filter .1s, transform .08s;
+  }
+  .bugs-panel .spawn{ background:var(--bug); }
+  .spawn:hover{ filter:brightness(1.08); }
+  .spawn:active{ transform:translateY(1px); }
+  .spawn:disabled{ background:#4a3f30; color:var(--text-faint); cursor:not-allowed; filter:none; }
+  .evo { display:flex; flex-direction:column; gap:4px; align-items:center; }
+  .evo button {
+    font-family:var(--font-mono); font-size:11px; color:var(--text); background:var(--soil-600);
+    border:1px solid var(--line); border-radius:7px; width:30px; cursor:pointer; padding:2px 0; transition:border-color .1s;
+  }
+  .evo button:hover{ border-color:var(--ant); }
+  .evo button:disabled{ opacity:.3; cursor:default; }
+
+  .cart {
+    width:42px; height:42px; margin:1px auto; border-radius:10px; cursor:pointer;
+    background:radial-gradient(circle at 50% 40%, rgba(245,166,35,.10), transparent 70%), var(--soil-600);
+    border:1px solid var(--line); display:flex; align-items:center; justify-content:center;
+    transition:border-color .12s, box-shadow .15s; user-select:none;
+  }
+  .cart:hover { border-color:var(--ant); }
+  .cart:active { transform:translateY(1px); }
+  .cart svg { width:82%; height:82%; overflow:visible; }
+  .cart.autospawning { border-color:var(--gold); box-shadow:0 0 0 2px rgba(255,215,106,.4); animation:autospawnPulse 1s infinite; }
+  @keyframes autospawnPulse { 0%,100%{ box-shadow:0 0 0 2px rgba(255,215,106,.4);} 50%{ box-shadow:0 0 0 5px rgba(255,215,106,.12);} }
+  .cstats.hidden { display:none; }
+  .stagepips { display:flex; gap:3px; }
+  .pip { width:100%; height:3px; border-radius:2px; background:var(--line); }
+  .pip.on { background:var(--ant); }
+  .zombie .pip.on{ background:var(--gold); }
+
+  :focus-visible{ outline:2px solid var(--ant-glow); outline-offset:2px; }
+  @media (prefers-reduced-motion:reduce){ *{ transition:none!important; } }
+
+  .xp {
+    font-family:var(--font-mono); font-weight:700; font-size:14px; color:var(--gold);
+    background:var(--soil-700); border:1px solid var(--line); border-radius:10px; padding:8px 14px;
+    transition:color .12s, border-color .12s, background .12s;
+  }
+  .xp.flash { color:#fff; background:#5a1d1d; border-color:var(--blood); }
+
+  .basehud { display:flex; align-items:center; gap:8px; background:var(--soil-700); border:1px solid var(--line); border-radius:10px; padding:7px 12px; }
+  .basehud .lbl { font-family:var(--font-mono); font-size:11px; color:var(--text-faint); letter-spacing:.05em; }
+  .basebarwrap { width:90px; height:8px; background:#000; border-radius:4px; overflow:hidden; }
+  .basebarfill { height:100%; width:100%; background:#63c132; transition:width .2s, background .2s; }
+  .basehp { font-family:var(--font-mono); font-size:11px; color:var(--text-dim); min-width:56px; }
+
+  .cannonBtn { background:var(--soil-600); border:1px solid var(--blood); color:var(--text); }
+  .cannonBtn:hover { background:#3a1d18; }
+  .cannonBtn:disabled { opacity:.55; cursor:not-allowed; border-color:var(--line); }
+  #speedBtn.active { border-color:var(--ant); color:var(--ant-glow); background:#241a10; }
+  #pauseBtn:disabled { opacity:.4; cursor:not-allowed; }
+
+  .pause-overlay {
+    display:none; position:fixed; inset:0; background:rgba(10,8,5,.72); z-index:80;
+    align-items:center; justify-content:center;
+  }
+  .pause-overlay.show { display:flex; }
+  .pause-modal {
+    background:linear-gradient(180deg,var(--soil-700),var(--soil-800)); border:1px solid var(--line);
+    border-radius:16px; padding:26px 30px; display:flex; flex-direction:column; gap:12px; align-items:stretch;
+    min-width:260px; box-shadow:0 20px 60px rgba(0,0,0,.55);
+  }
+  .pause-title { font-family:var(--font-display); font-weight:800; font-size:22px; color:var(--ant); text-align:center; margin-bottom:6px; }
+  .pause-btn { padding:12px 16px; font-size:12.5px; }
+  .pause-btn.quitbtn { border-color:var(--blood); color:#ffb0a0; }
+  .pause-btn.quitbtn:hover { background:#3a1d18; }
+  .renameInput {
+    font-family:var(--font-mono); font-size:13px; color:var(--text); background:var(--soil-900);
+    border:1px solid var(--line); border-radius:10px; padding:10px 12px; outline:none; width:100%; box-sizing:border-box;
+  }
+  .renameInput:focus { border-color:var(--ant); }
+
+  /* ---- home page / battle prep ---- */
+  #homePage, #battlePrepPage, #stageSelectionPage, #battleSelectionPage, #summerStageSelectionPage, #settingsPage, #progressPage, #antSlotsPage, #rareAntSlotsPage, #storagePage { display:none; height:100vh; overflow-y:auto; }
+  .centerWrap {
+    max-width:520px; margin:0 auto; min-height:100vh; padding:26px 20px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:16px;
+  }
+  /* the round list (and, on the Progress page, the slot list) can grow past one screen — top-align
+     and let the page scroll instead of vertically centering (centering a flex container that
+     overflows can clip its top when scrolled) */
+  #battleSelectionPage .centerWrap, #summerStageSelectionPage .centerWrap, #progressPage .centerWrap, #storagePage .centerWrap { min-height:auto; justify-content:flex-start; padding-top:40px; padding-bottom:40px; }
+  .centerWrap h1 { font-family:var(--font-display); font-weight:800; font-size:clamp(30px,6vw,52px); margin:0 0 6px; letter-spacing:-.02em; }
+  .centerWrap h1 .a{color:var(--ant);} .centerWrap h1 .b{color:var(--bug);}
+
+  /* ---- seasonal events (Home Page only) ---- */
+  #homePage { transition:background .4s; }
+  #homePage.summer-event {
+    background:linear-gradient(180deg,#8fd7ff 0%,#bfeaff 30%,#ffe3a0 62%,#f2c46a 100%);
+  }
+  #homePage.summer-event .centerWrap h1 .a { color:#c4600f; }
+  #homePage.summer-event .centerWrap h1 .b { color:#116372; }
+  .eventBadge {
+    display:none; font-family:var(--font-mono); font-size:12px; font-weight:700; letter-spacing:.04em;
+    color:#8a4a10; background:rgba(255,255,255,.6); border:1px solid #f2b25a; border-radius:999px;
+    padding:6px 14px; margin-bottom:12px;
+  }
+  .eventBadge.show { display:inline-block; }
+  .summerScene { display:none; width:100%; max-width:520px; margin:0 auto 10px; border-radius:14px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,.25); }
+  .summerScene.show { display:block; }
+  .prepButtons { display:flex; flex-direction:column; gap:14px; width:100%; max-width:320px; margin-top:8px; }
+  .prepButtons .startbtn { margin:0; width:100%; }
+  .prepButtons .startbtn.noop { opacity:.55; }
+  .prepButtons .startbtn:disabled { opacity:.4; cursor:not-allowed; filter:none; }
+  .roundSub { font-family:var(--font-mono); font-size:12px; color:var(--text-dim); margin-top:-8px; margin-bottom:6px; }
+  .slotRow { display:flex; align-items:center; gap:8px; width:100%; }
+  .slotRow .startbtn { flex:1; }
+  .slotDeleteBtn {
+    flex:0 0 auto; font-family:var(--font-mono); font-weight:700; font-size:14px; color:#ffb0a0;
+    background:var(--soil-600); border:1px solid var(--blood); border-radius:10px; width:40px; height:40px; cursor:pointer;
+  }
+  .slotDeleteBtn:hover { background:#3a1d18; }
+
+  /* ---- ant slots (unlocked after beating the Virginia round) ---- */
+  .antSlotsRow { display:none; gap:14px; margin-top:6px; }
+  .antSlotsRow.show { display:flex; }
+  .antSlotIcon {
+    width:56px; height:56px; border-radius:50%; font-size:26px; cursor:pointer;
+    background:radial-gradient(circle at 35% 30%, var(--ant-glow), var(--ant-deep));
+    border:2px solid var(--gold); box-shadow:0 0 0 3px var(--soil-800), 0 2px 8px rgba(0,0,0,.4);
+    transition:transform .1s, filter .1s;
+  }
+  .antSlotIcon:hover { filter:brightness(1.1); transform:translateY(-1px); }
+  .antSlotIcon.rare { background:radial-gradient(circle at 35% 30%, #e8b8ff, #7a3fb0); border-color:#c86fb0; }
+  .antSlotIcon.storage { background:radial-gradient(circle at 35% 30%, #e8cf9a, #6a4d2a); border-color:#c9a05a; }
+  .slotMachine {
+    width:100%; max-width:320px; padding:20px; border-radius:18px;
+    background:linear-gradient(180deg,var(--soil-700),var(--soil-800)); border:3px solid var(--gold);
+    box-shadow:0 0 24px rgba(255,215,106,.15), inset 0 0 20px rgba(0,0,0,.4);
+  }
+  .slotMachine.rare { border-color:#c86fb0; box-shadow:0 0 24px rgba(200,111,176,.2), inset 0 0 20px rgba(0,0,0,.4); }
+  .slotReels { display:flex; gap:10px; justify-content:center; }
+  .reel {
+    width:70px; height:70px; border-radius:10px; background:var(--soil-900); border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center; font-size:34px;
+  }
+
+  /* ---- home screen ---- */
+  #homeScreen { display:none; height:100vh; overflow-y:auto; }
+  .homeWrap { max-width:1100px; margin:0 auto; padding:26px 20px 60px; position:relative; }
+  .homeHead { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; flex-wrap:wrap; gap:12px; }
+  .homeHead h1 { font-family:var(--font-display); font-weight:800; font-size:clamp(26px,5vw,44px); margin:0; letter-spacing:-.02em; }
+  .homeHead h1 .a{color:var(--ant);} .homeHead h1 .b{color:var(--bug);}
+  .coinhud {
+    font-family:var(--font-mono); font-weight:700; font-size:18px; color:var(--gold);
+    background:var(--soil-700); border:1px solid var(--line); border-radius:12px; padding:9px 16px;
+  }
+  .coinhud.flash { color:#fff; background:#5a1d1d; border-color:var(--blood); }
+  .homeSub { color:var(--text-dim); font-size:14px; margin:4px 0 20px; }
+  .homeMsg {
+    display:none; font-family:var(--font-mono); font-size:13.5px; color:var(--gold);
+    background:var(--soil-700); border:1px solid var(--gold); border-radius:10px; padding:12px 16px; margin-bottom:20px;
+  }
+  .startbtn {
+    font-family:var(--font-display); font-weight:700; font-size:16px; color:#17120c;
+    background:var(--ant); border:none; border-radius:12px; padding:14px 28px; cursor:pointer;
+    margin:22px auto 0; display:block; transition:filter .1s, transform .08s;
+  }
+  .startbtn:hover{ filter:brightness(1.08); }
+  .startbtn:active{ transform:translateY(1px); }
+  #homeShop .card .cname { min-height:auto; }
+  .nextcost { font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint); min-height:14px; }
+
+  .equipbarwrap { margin-bottom:22px; }
+  .equipbarhead { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  .equipbarhead .tag { font-family:var(--font-mono); font-size:12px; letter-spacing:.18em; text-transform:uppercase; color:var(--ant); }
+  .equipbarhead .sub { font-family:var(--font-mono); font-size:11.5px; color:var(--text-dim); }
+  .equipbar { display:grid; grid-template-columns:repeat(10,1fr); gap:6px; transition:transform .1s; }
+  .equipbar.flash { animation:shake .26s; }
+  @keyframes shake { 25%{transform:translateX(-4px);} 75%{transform:translateX(4px);} }
+  .equipslot {
+    height:44px; border-radius:8px; border:1px dashed var(--line); background:var(--soil-700);
+    display:flex; align-items:center; justify-content:center; text-align:center;
+    font-family:var(--font-mono); font-size:9.5px; color:var(--text-faint); padding:2px;
+  }
+  .equipslot.filled { border:1px solid var(--ant-deep); background:#241a10; color:var(--ant-glow); font-weight:700; }
+  @media (max-width:700px){ .equipbar{ grid-template-columns:repeat(5,1fr);} }
+
+  .equipbtn {
+    width:100%; font-family:var(--font-mono); font-size:11.5px; font-weight:700; letter-spacing:.04em;
+    background:var(--soil-600); border:1px solid var(--line); color:var(--text); border-radius:9px;
+    padding:8px 6px; cursor:pointer; transition:border-color .1s, background .1s;
+  }
+  .equipbtn:hover { border-color:var(--ant); }
+  .equipbtn.equipped { background:#241a10; border-color:var(--ant); color:var(--ant-glow); }
+
+  .upgradesRow { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:22px; }
+  @media (max-width:900px){ .upgradesRow{ grid-template-columns:1fr 1fr; } }
+  @media (max-width:520px){ .upgradesRow{ grid-template-columns:1fr; } }
+  .upgradeCard {
+    background:linear-gradient(180deg,var(--soil-700),var(--soil-800));
+    border:1px solid var(--line); border-left:3px solid var(--gold); border-radius:13px; padding:12px; display:flex; flex-direction:column; gap:8px;
+  }
+</style>
+</head>
+<body>
+
+<div id="homePage">
+  <div class="centerWrap">
+    <div class="eventBadge" id="eventBadge">☀️ Summer Event · June 1 – August 31</div>
+    <div class="eventBadge" id="summerGiftBanner"></div>
+    <div class="summerScene" id="summerScene">
+      <svg viewBox="0 0 600 220" width="100%" height="auto" role="img" aria-label="Ants relaxing on beach chairs under an umbrella, one with a drink topped with a tiny umbrella">
+        <defs>
+          <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#8fd7ff"/>
+            <stop offset="100%" stop-color="#d9f2ff"/>
+          </linearGradient>
+          <linearGradient id="sandGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#f2c46a"/>
+            <stop offset="100%" stop-color="#e0a94a"/>
+          </linearGradient>
+        </defs>
+        <rect x="0" y="0" width="600" height="150" fill="url(#skyGrad)"/>
+        <circle cx="70" cy="46" r="24" fill="#ffd76a"/>
+        <circle cx="70" cy="46" r="24" fill="none" stroke="#ffb347" stroke-width="2" opacity=".5"/>
+        <rect x="0" y="150" width="600" height="70" fill="url(#sandGrad)"/>
+        <path d="M0,150 Q150,140 300,150 T600,150" fill="none" stroke="#c9903a" stroke-width="2" opacity=".5"/>
+
+        <!-- side table + glass of water with a tiny umbrella -->
+        <ellipse cx="120" cy="196" rx="20" ry="6" fill="#c9903a" opacity=".4"/>
+        <rect x="112" y="170" width="16" height="26" rx="2" fill="#8a5a2a"/>
+        <path d="M115,168 L125,168 L122,150 L118,150 Z" fill="#bfe3ff"/>
+        <path d="M116,158 Q120,153 124,158" fill="none" stroke="#8fd7ff" stroke-width="1.5"/>
+        <line x1="120" y1="150" x2="128" y2="138" stroke="#5a3a1a" stroke-width="1.5"/>
+        <path d="M128,138 L142,142 L128,148 Z" fill="#e0563b"/>
+        <path d="M128,138 L114,142 L128,148 Z" fill="#f2f2f2"/>
+
+        <!-- beach umbrella blocking the sun -->
+        <line x1="300" y1="70" x2="300" y2="180" stroke="#5a3a1a" stroke-width="5"/>
+        <path d="M220,70 A80,50 0 0 1 380,70 Z" fill="#e0563b"/>
+        <path d="M220,70 A80,50 0 0 1 260,58 L260,70 Z" fill="#f2f2f2"/>
+        <path d="M260,58 A80,50 0 0 1 340,58 L340,70 Z" fill="#e0563b"/>
+        <path d="M340,58 A80,50 0 0 1 380,70 L340,70 Z" fill="#f2f2f2"/>
+        <path d="M220,70 Q300,86 380,70" fill="none" stroke="#a5401e" stroke-width="2"/>
+
+        <!-- ant on a beach chair (left) -->
+        <g transform="translate(150,175)">
+          <path d="M-30,10 L30,10 L20,-8 L-20,-8 Z" fill="#8a5a2a"/>
+          <line x1="-25" y1="10" x2="-25" y2="20" stroke="#5a3a1a" stroke-width="3"/>
+          <line x1="25" y1="10" x2="25" y2="20" stroke="#5a3a1a" stroke-width="3"/>
+          <ellipse cx="-8" cy="-6" rx="12" ry="7" fill="#1c1c1c"/>
+          <ellipse cx="8" cy="-9" rx="9" ry="6" fill="#1c1c1c"/>
+          <circle cx="19" cy="-11" r="5" fill="#1c1c1c"/>
+          <ellipse cx="19" cy="-11" rx="5" ry="2.6" fill="#2a2a2a" opacity=".85"/>
+          <line x1="-2" y1="-2" x2="-2" y2="8" stroke="#000" stroke-width="1.4"/>
+          <line x1="6" y1="-3" x2="8" y2="7" stroke="#000" stroke-width="1.4"/>
+        </g>
+
+        <!-- ant on a beach chair (right) -->
+        <g transform="translate(430,175) scale(-1,1)">
+          <path d="M-30,10 L30,10 L20,-8 L-20,-8 Z" fill="#8a5a2a"/>
+          <line x1="-25" y1="10" x2="-25" y2="20" stroke="#5a3a1a" stroke-width="3"/>
+          <line x1="25" y1="10" x2="25" y2="20" stroke="#5a3a1a" stroke-width="3"/>
+          <ellipse cx="-8" cy="-6" rx="12" ry="7" fill="#1c1c1c"/>
+          <ellipse cx="8" cy="-9" rx="9" ry="6" fill="#1c1c1c"/>
+          <circle cx="19" cy="-11" r="5" fill="#1c1c1c"/>
+          <ellipse cx="19" cy="-11" rx="5" ry="2.6" fill="#2a2a2a" opacity=".85"/>
+          <line x1="-2" y1="-2" x2="-2" y2="8" stroke="#000" stroke-width="1.4"/>
+          <line x1="6" y1="-3" x2="8" y2="7" stroke="#000" stroke-width="1.4"/>
+        </g>
+      </svg>
+    </div>
+    <h1><span class="a">Battle</span> <span class="b">Ants</span></h1>
+    <button class="startbtn" id="playBtn">▶ Play</button>
+    <button class="startbtn" id="settingsBtn" style="background:var(--soil-600); color:var(--text);">⚙ Settings</button>
+  </div>
+</div>
+
+<div id="settingsPage">
+  <div class="centerWrap">
+    <h1><span class="a">Settings</span></h1>
+    <div class="prepButtons">
+      <button class="startbtn" id="soundBtn">🔊 Sound: On</button>
+      <button class="startbtn" id="progressBtn">📊 Progress</button>
+    </div>
+    <button class="startbtn" id="backFromSettingsBtn" style="background:var(--soil-600); color:var(--text); max-width:320px; width:100%;">← Back</button>
+  </div>
+</div>
+
+<div id="progressPage">
+  <div class="centerWrap">
+    <h1><span class="a">Progress</span></h1>
+    <div class="homeMsg" id="progressMsg"></div>
+    <div class="nextcost" id="activeProgressInfo"></div>
+    <div class="prepButtons">
+      <button class="startbtn" id="newProgressBtn">🆕 New Progress</button>
+    </div>
+    <div class="prepButtons" id="savedProgressList"></div>
+    <button class="startbtn" id="backFromProgressBtn" style="background:var(--soil-600); color:var(--text); max-width:320px; width:100%;">← Back</button>
+  </div>
+  <div class="pause-overlay" id="renameOverlay">
+    <div class="pause-modal">
+      <div class="pause-title">Rename Progress</div>
+      <input type="text" class="renameInput" id="renameInput" maxlength="40" placeholder="Progress name">
+      <button class="btn pause-btn" id="renameConfirmBtn">✓ Rename</button>
+      <button class="btn pause-btn quitbtn" id="renameCancelBtn">✕ Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div id="battlePrepPage">
+  <div class="centerWrap">
+    <h1><span class="a">Battle</span> <span class="b">Preparation</span></h1>
+    <div class="homeMsg" id="homeMsg"></div>
+    <div class="prepButtons">
+      <button class="startbtn" id="equipBtn">🛠 Equip</button>
+      <button class="startbtn" id="battleBtn">⚔ Battle</button>
+      <button class="startbtn" id="endlessBtn">♾ Endless Battle</button>
+    </div>
+    <div class="roundSub" id="endlessLockMsg"></div>
+    <div class="antSlotsRow" id="antSlotsRow">
+      <button class="antSlotIcon" id="antSlotsBtn" title="Ant Slots">🐜</button>
+      <button class="antSlotIcon rare" id="rareAntSlotsBtn" title="Rare Ant Slots">🐜</button>
+      <button class="antSlotIcon storage" id="storageBtn" title="Storage">📦</button>
+    </div>
+    <button class="startbtn" id="backToHomePageBtn" style="background:var(--soil-600); color:var(--text); max-width:320px; width:100%;">← Back</button>
+  </div>
+</div>
+
+<div id="stageSelectionPage">
+  <div class="centerWrap">
+    <h1><span class="a">Stage</span> <span class="b">Selection</span></h1>
+    <div class="prepButtons">
+      <button class="startbtn" id="stateStagesBtn">🗺 State Stages</button>
+      <button class="startbtn" id="summerStagesBtn" disabled title="Coming soon">☀ Summer Stages</button>
+    </div>
+    <button class="startbtn" id="backFromStageSelectionBtn" style="background:var(--soil-600); color:var(--text); max-width:320px; width:100%;">← Back</button>
+  </div>
+</div>
+
+<div id="summerStageSelectionPage">
+  <div class="centerWrap">
+    <h1><span class="a">Summer</span> <span class="b">Stages</span></h1>
+    <div class="prepButtons" id="summerStageSelectButtons"></div>
+    <button class="startbtn" id="backFromSummerStageSelectionBtn" style="background:var(--soil-600); color:var(--text); max-width:320px; width:100%;">← Back</button>
+  </div>
+</div>
+
+<div id="antSlotsPage">
+  <div class="centerWrap">
+    <h1><span class="a">Ant</span> <span class="b">Slots</span></h1>
+    <div class="nextcost" id="antSlotsSpinCount">Spins: 0</div>
+    <div class="slotMachine">
+      <div class="slotReels" id="antSlotsReels">
+        <div class="reel">🐜</div>
+        <div class="reel">🍯</div>
+        <div class="reel">🐜</div>
+      </div>
+    </div>
+    <div class="nextcost" id="antSlotsResult">Every 100 bugs killed in Endless Battle earns 2 spins here.</div>
+    <button class="startbtn" id="spinAntSlotsBtn">🎰 Spin</button>
+    <button class="startbtn" id="spin10AntSlotsBtn" style="display:none;">🎰 Spin 10×</button>
+    <button class="startbtn" id="backFromAntSlotsBtn" style="background:var(--soil-600); color:var(--text); max-width:320px; width:100%;">← Back</button>
+  </div>
+</div>
+
+<div id="rareAntSlotsPage">
+  <div class="centerWrap">
+    <h1><span class="a">Rare</span> <span class="b">Ant Slots</span></h1>
+    <div class="nextcost" id="rareAntSlotsSpinCount">Spins: 0</div>
+    <div class="slotMachine rare">
+      <div class="slotReels" id="rareAntSlotsReels">
+        <div class="reel">👑</div>
+        <div class="reel">🐜</div>
+        <div class="reel">💎</div>
+      </div>
+    </div>
+    <div class="nextcost" id="rareAntSlotsResult">Every 500 bugs killed in Endless Battle earns 1 spin here.</div>
+    <button class="startbtn" id="spinRareAntSlotsBtn">🎰 Spin</button>
+    <button class="startbtn" id="spin10RareAntSlotsBtn" style="display:none;">🎰 Spin 10×</button>
+    <button class="startbtn" id="backFromRareAntSlotsBtn" style="background:var(--soil-600); color:var(--text); max-width:320px; width:100%;">← Back</button>
+  </div>
+</div>
+
+<div id="storagePage">
+  <div class="centerWrap">
+    <h1><span class="a">Storage</span></h1>
+    <div class="nextcost">Ants you've rolled sit here until you use them or sell them.</div>
+    <div id="storageList" style="width:100%; max-width:420px; display:flex; flex-direction:column; gap:10px; margin-top:8px;"></div>
+    <button class="startbtn" id="backFromStorageBtn" style="background:var(--soil-600); color:var(--text); max-width:320px; width:100%;">← Back</button>
+  </div>
+</div>
+
+<div id="battleSelectionPage">
+  <div class="centerWrap">
+    <h1><span class="a">Battle</span> <span class="b">Selection</span></h1>
+    <div class="prepButtons" id="battleSelectButtons"></div>
+    <button class="startbtn" id="backFromSelectionBtn" style="background:var(--soil-600); color:var(--text); max-width:320px; width:100%;">← Back</button>
+  </div>
+</div>
+
+<div id="homeScreen">
+  <div class="homeWrap">
+    <div class="homeHead">
+      <h1><span class="a">Battle Ants</span> <span class="b">Home Base</span></h1>
+      <div class="coinhud" id="coinHud">🪙 0 Ant Coins</div>
+    </div>
+    <p class="homeSub">You start with only the base Ant. Every other line has to be permanently unlocked with Ant Coins before it can be equipped. Once a line is unlocked, spend Ant Coins on it here too for stronger starting tiers — each tier costs half its in-run XP price. Unlocks apply the moment you start a run.</p>
+
+    <div class="upgradesRow" id="upgradesRow">
+      <div class="upgradeCard" id="moneyCapCard"></div>
+      <div class="upgradeCard" id="incomeCard"></div>
+      <div class="upgradeCard" id="baseHpCard"></div>
+      <div class="upgradeCard" id="cannonDmgCard"></div>
+      <div class="upgradeCard" id="cannonRechargeCard"></div>
+    </div>
+
+    <div class="equipbarwrap">
+      <div class="equipbarhead"><span class="tag">Equip bar</span><span class="sub" id="equipCount">0 / 10 equipped</span></div>
+      <div class="equipbar" id="equipBar"></div>
+      <p class="homeSub" style="margin:8px 0 0">Choose up to 10 ant lines to bring into your run — tap "Equip" on a card below.</p>
+    </div>
+
+    <div class="cards" id="homeShop"></div>
+    <button class="startbtn" id="backToPrepBtn" style="background:var(--soil-600); color:var(--text);">← Back</button>
+  </div>
+</div>
+
+<div id="gameScreen">
+<div class="wrap">
+
+  <div class="top-zone">
+    <header class="top">
+      <h1><span class="a">Battle</span> <span class="b">Ants</span></h1>
+      <div class="hud">
+        <div class="wavehud" id="waveHud">Stage 1 · Wave 1</div>
+        <div class="count">Ants <span class="ca" id="antCount">0</span> · Bugs <span class="cb" id="bugCount">0</span></div>
+        <div class="basehud"><span class="lbl">BASE</span><div class="basebarwrap"><div class="basebarfill" id="baseBarFill"></div></div><span class="basehp" id="baseHpText">30,000</span></div>
+        <div class="xp" id="xpDisplay">0 XP</div>
+        <div class="money" id="money">100¢</div>
+        <button class="btn cannonBtn" id="cannonBtn">🔫 Fire Cannon</button>
+        <button class="btn" id="speedBtn">⏩ 2x Speed</button>
+        <button class="btn" id="pauseBtn">⏸ Pause</button>
+      </div>
+    </header>
+
+    <div class="field-shell" id="fieldShell">
+      <span class="zone-label left">Bug spawn →</span>
+      <span class="zone-label right">← Ant spawn</span>
+      <svg id="field" viewBox="0 0 1000 360" preserveAspectRatio="xMidYMid meet" aria-label="Battlefield"></svg>
+      <div class="banner" id="banner"></div>
+    </div>
+
+    <div class="pause-overlay" id="pauseOverlay">
+      <div class="pause-modal">
+        <div class="pause-title">Paused</div>
+        <button class="btn pause-btn" id="resumeBtn">▶ Unpause</button>
+        <button class="btn pause-btn quitbtn" id="quitBtn">✕ Quit run — no Ant Coins earned</button>
+      </div>
+    </div>
+    <p class="hint">// Ants cost cents and march left · Bugs are free and march right · +25¢ every 2s · kill bugs for bounty · clear waves for XP · defend your base!</p>
+  </div>
+
+  <div class="scroll-zone">
+    <!-- ANTS -->
+    <div class="ants-panel">
+      <div class="panel-head"><span class="tag">Your ants</span><span class="sub">Click art to spawn · hold to toggle rapid-spawn · right-click for stats · ▲ costs XP to unlock a tier</span></div>
+      <div class="cards" id="antCards"></div>
+    </div>
+
+    <!-- BUGS -->
+    <div class="bugs-panel">
+      <div class="panel-head"><span class="tag">The bugs</span><span class="sub">Spawn automatically in waves · each pays a bounty when killed · right-click a card for stats</span></div>
+      <div class="cards" id="bugCards"></div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+
+<script>
+"use strict";
+const SVGNS = "http://www.w3.org/2000/svg";
+const FIELD_W = 1000, FIELD_H = 360;
+const RANGE = 22, ATTACK_MS = 600, MAX_ENTITIES = 260;
+const MOVE_TO_MID_SPEED = 42;
+const MAX_ANTS = 100;
+
+/* ---------------- DATA ---------------- */
+// Ant lines. cost is fixed across stages (cents to spawn). costs[i] = XP to unlock stage i+1.
+const ANT_LINES = [
+  { id:"ant", cost:50, speed:46, base:0.9, color:"#161616", leg:"#000000", accent:"#f2f2f2", costs:[75,100],
+    stages:[
+      {n:"Ant",hp:200,dmg:50},
+      {n:"Buff ant",hp:300,dmg:125,feat:{thick:true}},
+      {n:"Big buff ant",hp:400,dmg:200,feat:{thick:true}} ] },
+  { id:"worker", cost:100, speed:34, base:1.0, color:"#161616", leg:"#000000", accent:"#f2f2f2", costs:[150,200], unlockCost:2000,
+    stages:[
+      {n:"Worker ant",hp:5000,dmg:10,feat:{helmet:true}},
+      {n:"Manager ant",hp:7500,dmg:15,feat:{helmet:true}},
+      {n:"CEO ant",hp:10000,dmg:20,feat:{helmet:true,crown:true}} ] },
+  { id:"soldier", cost:200, speed:44, base:0.98, color:"#161616", leg:"#000000", accent:"#f2f2f2", costs:[300,400], unlockCost:4000,
+    stages:[
+      {n:"Soldier ant",hp:800,dmg:200,feat:{mand:true,shortAntennae:true}},
+      {n:"General ant",hp:1200,dmg:300,feat:{mand:true,shortAntennae:true,camoHat:true,badge:true}},
+      {n:"Mecha ant",hp:1600,dmg:400,feat:{robot:true}} ] },
+  { id:"tall", cost:400, speed:50, base:1.02, color:"#161616", leg:"#000000", accent:"#f2f2f2", costs:[600,800], unlockCost:8000,
+    stages:[
+      {n:"Tall ant",hp:1600,dmg:400,feat:{legs:true}},
+      {n:"Daddy long legs",hp:2400,dmg:600,feat:{legs:true}},
+      {n:"Centipede ant",hp:3200,dmg:800,feat:{seg:true}} ] },
+  { id:"fast", cost:500, speed:100, base:0.88, color:"#161616", leg:"#000000", accent:"#f2f2f2", costs:[750,1000], unlockCost:10000,
+    stages:[
+      {n:"Fast ant",hp:1200,dmg:300},
+      {n:"Sonic ant",hp:1800,dmg:450},
+      {n:"Lightning ant",hp:2400,dmg:600,feat:{glow:"#4db3e6"}} ] },
+  { id:"butterfly", cost:650, speed:56, base:1.05, color:"#161616", leg:"#000000", accent:"#f2f2f2", costs:[975,1300], unlockCost:13000,
+    stages:[
+      {n:"Butterfly ant",hp:2600,dmg:650,feat:{wings:true}},
+      {n:"Pterodactyl ant",hp:3900,dmg:975,feat:{dinoWings:true}},
+      {n:"Planet consumer",hp:5200,dmg:1300,feat:{singleBody:true,glow:"#c86fb0"}} ] },
+  { id:"fish", cost:800, speed:48, base:1.08, color:"#245fcf", leg:"#0f2c66", accent:"#8fd0ff", costs:[1200,1600], unlockCost:16000,
+    stages:[
+      {n:"Fish ant",hp:3200,dmg:800,feat:{fin:true}},
+      {n:"Whale ant",hp:4800,dmg:1200,feat:{whaleBody:true},sizeMod:0.72},
+      {n:"Kraken ant",hp:6400,dmg:1600,feat:{fin:true,tent:true,glow:"#3f8fd1"}} ] },
+  { id:"fire", cost:1000, speed:52, base:1.0, color:"#d0201a", leg:"#5e0f0a", accent:"#ffb347", costs:[1500,2000], unlockCost:20000,
+    stages:[
+      {n:"Fire ant",hp:4000,dmg:1000,feat:{glow:"#e05a2b"}},
+      {n:"Lizard ant",hp:6000,dmg:1500,feat:{glow:"#e05a2b"}},
+      {n:"Dragon ant",hp:8000,dmg:2000,feat:{glow:"#ff6a2b"}} ] },
+  { id:"titan", cost:1300, speed:30, base:1.35, color:"#8a8f99", leg:"#4a4d54", accent:"#c8ccd4", costs:[1950,2600], unlockCost:26000,
+    stages:[
+      {n:"Titan ant",hp:8000,dmg:2000,feat:{thick:true}},
+      {n:"Corrupted titan ant",hp:12000,dmg:3000,feat:{thick:true,corrupted:true}},
+      {n:"Demonic titan ant",hp:16000,dmg:4000,color:"#5a4550",feat:{thick:true,demon:true,eye:true,glow:"#7a1f1f"}} ] },
+  { id:"zombie", cost:6000, speed:38, base:1.15, color:"#6f8f3a", leg:"#3a4a1c", accent:"#a3c96a", zombie:true, unlockCost:120000,
+    costs:[1500,3000,4500,6750,10125,15178,22767,34150],
+    stages:[
+      {n:"Zombie ant",hp:20000,dmg:5000,color:"#6f8f3a",feat:{glow:"#6f8f3a",eye:true}},
+      {n:"Skeleton ant",hp:28000,dmg:7000,color:"#d9d4c4",leg:"#9a9482",feat:{eye:true}},
+      {n:"Death ant",hp:40000,dmg:10000,color:"#2b2b30",leg:"#000",accent:"#e0563b",feat:{eye:true,glow:"#e0563b"}},
+      {n:"Colossal death ant",hp:56000,dmg:14000,color:"#4a3a5a",feat:{eye:true,thick:true,glow:"#7a1f7a"}},
+      {n:"Demonic death ant",hp:80000,dmg:20000,color:"#7a1f1f",accent:"#ff4a2b",feat:{eye:true,wings:true,glow:"#e0563b"}},
+      {n:"5th dimension ant",hp:113000,dmg:28000,color:"#7d5fb0",feat:{eye:true,rings:1,glow:"#7d5fb0"}},
+      {n:"10th dimension ant",hp:160000,dmg:40000,color:"#3f6fd0",feat:{eye:true,rings:2,glow:"#3f6fd0"}},
+      {n:"100th dimensional ant",hp:226000,dmg:56500,color:"#d8d0e8",feat:{eye:true,rings:3,glow:"#c3a3ff"}},
+      {n:"Creator of all ants",hp:320000,dmg:80000,color:"#e6b93a",accent:"#fff2c0",feat:{eye:true,crown:true,rings:3,glow:"#ffd76a"}} ] },
+  { id:"summoner", cost:15000, speed:0, base:1.15, color:"#3a2f4a", leg:"#1a1420", accent:"#c86fb0", unlockCost:300000,
+    costs:[9000,13500,20250],
+    stages:[
+      {n:"Summoner ant",hp:320000,dmg:0,feat:{summonerKind:"summoner",stationary:true,summonAny:true,summonCap:5}},
+      {n:"Wizard ant",hp:480000,dmg:500,feat:{summonerKind:"wizard",stationary:true,summonAny:true,rangedLightning:true,summonCap:10}},
+      {n:"Necromancer ant",hp:640000,dmg:0,color:"#1a1a22",feat:{summonerKind:"necromancer",stationary:true,summonAny:true,charmOnHit:true,summonCap:15}},
+      {n:"Queen ant",hp:960000,dmg:0,color:"#3a1f4a",feat:{summonerKind:"queen",moveToMiddle:true,summonAny:true,charmOnHit:true,summonBug:true,summonCap:10,summonBugCap:10}} ] },
+  { id:"stoner", cost:900, speed:0, base:1.0, color:"#4a5a34", leg:"#28311c", accent:"#d8c98a", unlockCost:18000,
+    costs:[1350,1800,2700,4050], coinCosts:[1350,1800,2700,4050],
+    stages:[
+      {n:"Stoner ant",hp:3600,dmg:900,feat:{moveToMiddle:true,ranged:true,glow:"#8fae52"}},
+      {n:"Archer ant",hp:5400,dmg:1350,feat:{moveToMiddle:true,ranged:true,glow:"#a97a3a"}},
+      {n:"Pistol ant",hp:7200,dmg:1800,feat:{moveToMiddle:true,ranged:true,glow:"#6a6f78"}},
+      {n:"Sniper ant",hp:10800,dmg:2700,feat:{moveToMiddle:true,ranged:true,glow:"#355c35"}},
+      {n:"Shotgun ant",hp:16200,dmg:4050,feat:{moveToMiddle:true,ranged:true,glow:"#c0562b"}} ] },
+  { id:"pokey", cost:2000, speed:40, base:1.05, color:"#5a6a2a", leg:"#33401a", accent:"#c9d878", unlockCost:40000,
+    costs:[3000,4000], coinCosts:[1500,3000],
+    stages:[
+      {n:"Pokey ant",hp:8000,dmg:2000,feat:{thick:true}},
+      {n:"Thorny ant",hp:12000,dmg:3000,feat:{thick:true}},
+      {n:"Spikey ant",hp:16000,dmg:4000,feat:{thick:true,aoe:true,glow:"#c9d878"}} ] },
+  // Your literal HP/DMG figures ran past 300+ digits, which overflows a standard number
+  // (anything over ~309 digits becomes Infinity and breaks HP-bar/health math). Normalized
+  // to 1e300 HP / 1e250 DMG for the base stage instead — still comfortably bigger than The
+  // End's 1e60 HP, and the 1.5x/2x stage multipliers stay safely finite.
+  { id:"endkiller", cost:50000, speed:34, base:1.3, color:"#f5f0e0", leg:"#c9a83a", accent:"#fff6d0", unlockCost:250000,
+    costs:[166666,333333], coinCosts:[500000,750000],
+    stages:[
+      {n:"End killer",hp:1e300,dmg:1e250,feat:{thick:true,eye:true,glow:"#ffe680",killLimit:1}},
+      {n:"Super end killer",hp:1.5e300,dmg:1.5e250,feat:{thick:true,eye:true,glow:"#ffe680",killLimit:2}},
+      {n:"Mega end killer",hp:2e300,dmg:2e250,color:"#fff8e6",feat:{thick:true,eye:true,crown:true,glow:"#fff2b0",killLimit:5}} ] },
+  { id:"kungfu", cost:1500, speed:48, base:1.0, color:"#8a1f1f", leg:"#4a0f0f", accent:"#ffd76a", unlockCost:15000,
+    costs:[2250,3000], coinCosts:[1000,1500],
+    stages:[
+      {n:"Kung Fu ant",hp:1500,dmg:375,feat:{shortAntennae:true}},
+      {n:"Drunken master ant",hp:2250,dmg:562,feat:{shortAntennae:true,glow:"#c9a83a"}},
+      {n:"Dancer ant",hp:30000,dmg:8430,feat:{shortAntennae:true,glow:"#ffd76a"}} ] },
+  { id:"mrant", cost:500, speed:44, base:1.0, color:"#2a3a52", leg:"#141c2a", accent:"#e8e0c8", unlockCost:10000,
+    costs:[750,1000], coinCosts:[250,500],
+    stages:[
+      {n:"Mr. ant",hp:2000,dmg:500,feat:{badge:true}},
+      {n:"Super Mr. ant",hp:3000,dmg:750,feat:{badge:true,glow:"#4db3e6"}},
+      {n:"Hyper Mr. ant",hp:4000,dmg:1000,feat:{badge:true,crown:true,glow:"#8fd0ff"}} ] },
+  { id:"domant", cost:960, speed:46, base:1.05, color:"#2a0f0f", leg:"#150808", accent:"#ff2b2b", unlockCost:19200,
+    costs:[640,960], coinCosts:[1440,2160],
+    stages:[
+      {n:"Dom ant",hp:3840,dmg:960,feat:{eye:true}},
+      {n:"Executer ant",hp:5760,dmg:1440,feat:{eye:true,mand:true}},
+      {n:"Dark laser ant",hp:7680,dmg:2160,feat:{eye:true,mand:true,glow:"#ff2b2b"}} ] },
+  { id:"antsinfood", cost:750, speed:42, base:1.1, color:"#5a4a2a", leg:"#332615", accent:"#c9b880", unlockCost:15000,
+    costs:[500,750], coinCosts:[1125,1500],
+    stages:[
+      {n:"Ants in food",hp:3000,dmg:750},
+      {n:"Ant gang",hp:4500,dmg:1125,feat:{camoHat:true}},
+      {n:"Heavy assult A.N.T.",hp:6750,dmg:1500,feat:{camoHat:true,thick:true,badge:true}} ] },
+  { id:"ninja", cost:200, speed:60, base:0.9, color:"#1a1a1a", leg:"#000000", accent:"#3a3a3a", unlockCost:4000,
+    costs:[200,300], coinCosts:[300,400],
+    stages:[
+      {n:"Ninja ant",hp:800,dmg:200,feat:{shortAntennae:true}},
+      {n:"Ninja frog ant",hp:1200,dmg:300,feat:{shortAntennae:true,glow:"#3a8f5a"}},
+      {n:"Flying ninja ant",hp:1600,dmg:400,feat:{shortAntennae:true,wings:true,glow:"#8fd0ff"}} ] },
+  { id:"zombified", cost:750, speed:38, base:1.05, color:"#4a6a2a", leg:"#28401a", accent:"#a3c96a", unlockCost:15000,
+    costs:[750,1125], coinCosts:[500,750],
+    stages:[
+      {n:"Zombified ant",hp:3000,dmg:750,feat:{eye:true}},
+      {n:"Devil ant",hp:4500,dmg:1125,color:"#7a1f1f",feat:{eye:true,wings:true,glow:"#e0563b"}},
+      {n:"Skele-ant",hp:6000,dmg:1500,color:"#d9d4c4",leg:"#9a9482",feat:{eye:true}} ] },
+  { id:"samurai", cost:350, speed:48, base:1.0, color:"#2a2a3a", leg:"#141420", accent:"#ff4a4a", unlockCost:7000,
+    costs:[350,525], coinCosts:[525,700],
+    stages:[
+      {n:"Samurai ant",hp:1400,dmg:350,feat:{mand:true}},
+      {n:"Knight ant",hp:2100,dmg:525,feat:{mand:true,helmet:true}},
+      {n:"Pastry ant",hp:2800,dmg:700,feat:{mand:true,crown:true,glow:"#ffd76a"}} ] },
+  { id:"sumo", cost:300, speed:34, base:1.15, color:"#c9a876", leg:"#5a4a3a", accent:"#8a1f1f", unlockCost:6000,
+    costs:[300,450], coinCosts:[450,600],
+    stages:[
+      {n:"Sumo ant",hp:1200,dmg:300,feat:{thick:true}},
+      {n:"Madame sumo ant",hp:1800,dmg:450,feat:{thick:true,badge:true}},
+      {n:"Riceball ant",hp:2400,dmg:600,feat:{thick:true,glow:"#f2f2f2"}} ] },
+  { id:"boogie", cost:75, speed:65, base:0.75, color:"#e0563b", leg:"#8a2a1c", accent:"#ffd76a", unlockCost:1500,
+    costs:[75,112], coinCosts:[112,150],
+    stages:[
+      {n:"Boogie ant",hp:300,dmg:75},
+      {n:"Samba ant",hp:450,dmg:112,feat:{glow:"#ffd76a"}},
+      {n:"Gato amigo ant",hp:600,dmg:150,feat:{shortAntennae:true,glow:"#ff8f4a"}} ] },
+  { id:"moneko", cost:148, speed:58, base:0.85, color:"#f2f2f2", leg:"#c9a83a", accent:"#ff6a9e", unlockCost:2960,
+    costs:[148,222], coinCosts:[222,296],
+    stages:[
+      {n:"Moneko ant",hp:592,dmg:148,feat:{eye:true}},
+      {n:"Miss moneko ant",hp:888,dmg:222,feat:{eye:true,glow:"#ff6a9e"}},
+      {n:"Super star moneko ant",hp:1184,dmg:296,feat:{eye:true,crown:true,glow:"#ffd76a"}} ] },
+  // Gift-only line: never buyable with Ant Coins and never spinnable in either Ant Slots pool —
+  // the only way to get it is claiming the Summer Event's day-45 login gift (see checkSummerGift).
+  // Grows 1.5x per level instead of the usual 1.1x (growthMult), same as every other line otherwise.
+  { id:"summerant", cost:1500, speed:36, base:1.1, color:"#f2c94c", leg:"#8a5a1c", accent:"#ff6a4a",
+    costs:[3000], growthMult:1.5, giftOnly:true,
+    stages:[
+      {n:"Summer Ant",hp:27068,dmg:6767,feat:{glow:"#ffb347"}},
+      {n:"Cruiser Ant",hp:1560900,dmg:390200,color:"#2a6fb0",leg:"#123a5e",accent:"#ffffff",feat:{glow:"#4db3e6"}},
+      {n:"Gamer Ant",hp:90014000,dmg:22504000,color:"#7c3aed",leg:"#2a1454",accent:"#39ff88",feat:{glow:"#39ff88"}} ] },
+];
+
+// Bug roster. Spawns automatically in waves. Bounty paid on death.
+// Every bug's hp/dmg here is 5x its original roster value (a permanent, universal buff — applies
+// everywhere: Endless Battle waves AND every Battle Selection round). Still stacks multiplicatively
+// with the existing conditional multipliers (stageTierMult's 5x/10x past Endless stage 5/20, and
+// bugDifficultyMult's 1.5x-per-loop), since those are computed on top of whatever hp/dmg is passed
+// in here.
+const BUGS = [
+  { id:"termite", n:"Termite", hp:1500, dmg:150, bounty:50, speed:40, base:0.9, shape:"termite", color:"#cbbba0", leg:"#8a7c62" },
+  { id:"caterpillar", n:"Caterpillar", hp:18750, dmg:35, bounty:100, speed:26, base:0.6, shape:"caterpillar", color:"#7bbf4a", leg:"#4a7a2a" },
+  { id:"worm", n:"Worm", hp:7500, dmg:300, bounty:200, speed:32, base:0.55, shape:"worm", color:"#d98fa0", leg:"#a05a6a" },
+  { id:"spider", n:"Baby spider", hp:12500, dmg:600, bounty:400, speed:58, base:1.0, shape:"spider", color:"#3a3a42", leg:"#15151a" },
+  { id:"cockroach", n:"Cockroach", hp:15000, dmg:500, bounty:500, speed:64, base:0.95, shape:"cockroach", color:"#6b4a2a", leg:"#3a2614" },
+  { id:"grasshopper", n:"Grasshopper", hp:20000, dmg:900, bounty:650, speed:60, base:1.02, shape:"grasshopper", color:"#6fae3a", leg:"#3f6a1c" },
+  { id:"frog", n:"Frog", hp:27500, dmg:1250, bounty:800, speed:44, base:1.05, shape:"frog", color:"#4a9e5a", leg:"#2a6a38" },
+  { id:"lizard", n:"Lizard", hp:40000, dmg:1750, bounty:1000, speed:52, base:1.1, shape:"lizard", color:"#5a8f5a", leg:"#356035" },
+  { id:"bird", n:"Bird", hp:60000, dmg:2500, bounty:1300, speed:70, base:1.1, shape:"bird", color:"#d1673a", leg:"#8a3f1c" },
+  { id:"termiteking", n:"Termite king", hp:6000, dmg:1000, bounty:600, speed:34, base:1.5, shape:"termiteking", color:"#cbbba0", leg:"#8a7c62", crown:true, boss:true },
+  { id:"anteater", n:"Ant eater", hp:1200000, dmg:300000, bounty:10000, speed:24, base:1.7, shape:"anteater", color:"#8a7a5a", leg:"#5a4d38", boss:true },
+  { id:"kingcaterpillar", n:"King caterpillar", hp:75000, dmg:140, bounty:2500, speed:20, base:1.0, shape:"caterpillar", color:"#7bbf4a", leg:"#4a7a2a", crown:true, boss:true },
+  { id:"wormking", n:"Worm king", hp:30000, dmg:1200, bounty:2200, speed:26, base:1.0, shape:"worm", color:"#d98fa0", leg:"#a05a6a", crown:true, boss:true },
+  { id:"blackwidow", n:"Black widow", hp:50000, dmg:1200, bounty:2500, speed:52, base:1.3, shape:"spider", color:"#18181c", leg:"#000", widowMark:true, boss:true },
+  { id:"giantcockroach", n:"Giant cockroach", hp:60000, dmg:2000, bounty:3000, speed:56, base:1.4, shape:"cockroach", color:"#4a3018", leg:"#2a1a0c", boss:true },
+  { id:"kinggrasshopper", n:"King grasshopper", hp:80000, dmg:3600, bounty:3500, speed:56, base:1.35, shape:"grasshopper", color:"#4a8a24", leg:"#2f5a14", crown:true, boss:true },
+  { id:"toad", n:"Toad", hp:110000, dmg:5000, bounty:4200, speed:38, base:1.5, shape:"frog", color:"#5a7a3a", leg:"#354a1e", boss:true },
+  { id:"comododragon", n:"Comodo dragon", hp:160000, dmg:7000, bounty:5200, speed:46, base:1.6, shape:"lizard", color:"#4a5a3a", leg:"#2a3620", boss:true },
+  { id:"koribustard", n:"Kori bustard", hp:240000, dmg:10000, bounty:7000, speed:60, base:1.5, shape:"bird", color:"#8a7a5a", leg:"#4a3f2a", boss:true },
+  { id:"armadillo", n:"Armadillo", hp:12000, dmg:3000, bounty:900, speed:36, base:1.05, shape:"armadillo", color:"#8a7a5a", leg:"#5a4d38" },
+  { id:"kingarmadillo", n:"King armadillo", hp:48000, dmg:12000, bounty:4500, speed:40, base:1.45, shape:"armadillo", color:"#5a4d38", leg:"#3a2f20", crown:true, boss:true },
+  { id:"vaccume", n:"Vaccume", hp:2400000, dmg:600000, bounty:25000, speed:20, base:1.9, shape:"vaccume", color:"#9aa0a8", leg:"#3a3d42", boss:true },
+  { id:"aardvark", n:"Aardvark", hp:26665, dmg:6665, bounty:1800, speed:34, base:1.1, shape:"anteater", color:"#a08858", leg:"#6a5636" },
+  { id:"hugeaardvark", n:"Huge aardvark", hp:106660, dmg:26660, bounty:6000, speed:28, base:1.6, shape:"anteater", color:"#7a6544", leg:"#4a3c26", boss:true },
+  { id:"bugman", n:"Bug man", hp:1066665, dmg:0, bounty:30000, speed:22, base:2.0, shape:"bugman", color:"#3a2f26", leg:"#1a140f", boss:true, summonBugAlly:true, summonCapBugAlly:10 },
+  { id:"karenlawnchair", n:"Karen in the lawn chair", hp:240000, dmg:60000, bounty:7200, speed:18, base:1.8, shape:"bugman", color:"#e8c9a0", leg:"#8a6a4a", boss:true },
+  { id:"bugswatter", n:"Bug swatter", hp:60000, dmg:15000, bounty:1800, speed:55, base:1.3, shape:"grasshopper", color:"#e0392b", leg:"#2a2a2a", boss:true },
+  { id:"bugspray", n:"Bug spray", hp:80000, dmg:20000, bounty:2400, speed:40, base:1.5, shape:"vaccume", color:"#3a7a3a", leg:"#1a3a1a", boss:true },
+  { id:"weedwhacker", n:"Weed whacker", hp:120000, dmg:30000, bounty:3600, speed:30, base:1.6, shape:"anteater", color:"#f2a83a", leg:"#8a5a1c", boss:true },
+  { id:"lawnmower", n:"Lawn mower", hp:140000, dmg:35000, bounty:4200, speed:25, base:1.9, shape:"armadillo", color:"#c9a83a", leg:"#5a4a1c", boss:true },
+  { id:"theend", n:"The End", hp:5e60, dmg:5e30, bounty:100000, speed:26, base:2.2, shape:"theend", color:"#050505", leg:"#000000", boss:true },
+  // ---- Tick Season roster: only spawned while the Tick Season event is active ----
+  { id:"tick", n:"Tick", hp:4000, dmg:1000, bounty:120, speed:60, base:0.55, shape:"tick", color:"#6b3a24", leg:"#3a1d10" },
+  { id:"lonestartick", n:"Lone star tick", hp:4800, dmg:1200, bounty:145, speed:63, base:0.57, shape:"tick", color:"#7a4530", leg:"#452415" },
+  { id:"groundhogtick", n:"Groundhog tick", hp:5200, dmg:1300, bounty:155, speed:65, base:0.58, shape:"tick", color:"#5e3320", leg:"#331b10" },
+  { id:"deertick", n:"Deer tick", hp:5600, dmg:1400, bounty:170, speed:68, base:0.6, shape:"tick", color:"#8a5040", leg:"#4a2a20" },
+  { id:"americandogtick", n:"American dog tick", hp:6000, dmg:1500, bounty:180, speed:70, base:0.62, shape:"tick", color:"#9a6030", leg:"#55341a" },
+  { id:"westernblackleggedtick", n:"Western black-legged tick", hp:6400, dmg:1600, bounty:190, speed:72, base:0.63, shape:"tick", color:"#2a2018", leg:"#0f0b08" },
+  { id:"gulfcoasttick", n:"Gulf coast tick", hp:6800, dmg:1700, bounty:205, speed:74, base:0.65, shape:"tick", color:"#7a3a28", leg:"#401d14" },
+  { id:"rockymountainwoodtick", n:"Rocky Mountain wood tick", hp:7200, dmg:1800, bounty:215, speed:76, base:0.66, shape:"tick", color:"#6a4020", leg:"#3a2210" },
+  { id:"browndogtick", n:"Brown dog tick", hp:7600, dmg:1900, bounty:230, speed:78, base:0.68, shape:"tick", color:"#8a5a30", leg:"#4a2f18" },
+  { id:"asianlonghornedtick", n:"Asian long-horned tick", hp:8000, dmg:2000, bounty:240, speed:80, base:0.70, shape:"tick", color:"#9a4a2a", leg:"#52240f" },
+  { id:"sheeptick", n:"Sheep tick", hp:8400, dmg:2100, bounty:250, speed:82, base:0.72, shape:"tick", color:"#6a3020", leg:"#381810" },
+  { id:"taigatick", n:"Taiga tick", hp:8800, dmg:2200, bounty:265, speed:84, base:0.74, shape:"tick", color:"#4a3020", leg:"#241810" },
+  { id:"hyalommatick", n:"Hyalomma tick", hp:9200, dmg:2300, bounty:275, speed:86, base:0.76, shape:"tick", color:"#b06030", leg:"#603018" },
+  { id:"wintertick", n:"Winter tick", hp:9600, dmg:2400, bounty:290, speed:88, base:0.78, shape:"tick", color:"#8a8a90", leg:"#4a4a52" },
+  { id:"cattletick", n:"Cattle tick", hp:10000, dmg:2500, bounty:300, speed:90, base:0.80, shape:"tick", color:"#7a4020", leg:"#402010" },
+  { id:"castorbeantick", n:"Castor bean tick", hp:10400, dmg:2600, bounty:310, speed:92, base:0.82, shape:"tick", color:"#5a2a18", leg:"#2a140c" },
+  { id:"eartick", n:"Ear tick", hp:10800, dmg:2700, bounty:325, speed:94, base:0.84, shape:"tick", color:"#9a6a40", leg:"#4a3018" },
+  { id:"fevertick", n:"Fever tick", hp:11200, dmg:2800, bounty:335, speed:96, base:0.86, shape:"tick", color:"#a03020", leg:"#501810" },
+  { id:"pajahuellotick", n:"Pajahuello tick", hp:11600, dmg:2900, bounty:350, speed:98, base:0.88, shape:"tick", color:"#6a4a30", leg:"#352418" },
+  { id:"africanbluetick", n:"African blue tick", hp:12000, dmg:3000, bounty:360, speed:100, base:0.90, shape:"tick", color:"#3a5a7a", leg:"#1a2f42" },
+  { id:"bonttick", n:"Bont tick", hp:12400, dmg:3100, bounty:370, speed:102, base:0.92, shape:"tick", color:"#8a5a2a", leg:"#452c14" },
+  // Tick Bush: a stationary hazard, not a bug to defeat — 10 flat hp, deals no damage, ants never
+  // target it on their own, and it periodically calls in a random tick as reinforcement.
+  { id:"tickbush", n:"Tick Bush", hp:10, dmg:0, bounty:0, speed:0, base:1.15, shape:"bush", color:"#3a6b2a", leg:"#1f3d18", noAntTarget:true, summonsTicks:true },
+];
+const TICK_BUG_IDS = ["tick","lonestartick","groundhogtick","deertick","americandogtick",
+  "westernblackleggedtick","gulfcoasttick","rockymountainwoodtick","browndogtick",
+  "asianlonghornedtick","sheeptick","taigatick","hyalommatick","wintertick","cattletick",
+  "castorbeantick","eartick","fevertick","pajahuellotick","africanbluetick","bonttick"];
+
+/* ---------------- ART ---------------- */
+function esc(c){ return c; }
+
+function antArt(stage, line){
+  const col = stage.color || line.color;
+  const leg = stage.leg || line.leg;
+  const acc = stage.accent || line.accent;
+  const f = stage.feat || {};
+  const thick = f.thick ? 1.35 : 1;
+  let s = "";
+  if (f.glow) s += `<ellipse cx="2" cy="0" rx="26" ry="16" fill="${f.glow}" opacity="0.28"/>`;
+  if (f.rings){ for(let i=1;i<=f.rings;i++){ s += `<circle cx="2" cy="0" r="${14+i*6}" fill="none" stroke="${f.glow||acc}" stroke-width="1.4" opacity="${0.5 - i*0.1}"/>`; } }
+  const outline = line.outline || "#ffffff";
+
+  // ---- summoner family: robed caster with staff, hood/hat/crown per stage ----
+  if (f.summonerKind){
+    const kind = f.summonerKind;
+    const robeColor = kind==="queen" ? "#3a1f4a" : kind==="necromancer" ? "#1a1a22" : kind==="wizard" ? "#1f2f5a" : "#2a1f3a";
+    const trim = kind==="queen" ? "#ffd76a" : kind==="wizard" ? "#4db3e6" : kind==="necromancer" ? "#7dd97d" : "#c86fb0";
+    for (const bx of [6,-6]){
+      s += `<line x1="${bx}" y1="0" x2="${bx-2}" y2="9" stroke="${leg}" stroke-width="1.6" stroke-linecap="round"/>`;
+      s += `<line x1="${bx}" y1="0" x2="${bx-2}" y2="-9" stroke="${leg}" stroke-width="1.6" stroke-linecap="round"/>`;
+    }
+    s += `<path d="M14 10 Q16 0 10 -10 Q4 -16 -8 -14 Q-16 -10 -16 0 Q-16 10 -8 13 Q0 16 14 10 Z" fill="${robeColor}" stroke="${outline}" stroke-width="1.1"/>`;
+    s += `<circle cx="-10" cy="-3" r="6" fill="${col}" stroke="${outline}" stroke-width="1"/>`;
+    const eyeCol = (kind==="necromancer"||kind==="queen") ? "#7dd97d" : "#e0563b";
+    s += `<circle cx="-12.5" cy="-5" r="1.5" fill="${eyeCol}"/><circle cx="-12.5" cy="-1" r="1.5" fill="${eyeCol}"/>`;
+    s += `<line x1="-14" y1="-6" x2="-19" y2="-12" stroke="${leg}" stroke-width="1.3" stroke-linecap="round"/>`;
+    s += `<line x1="-14" y1="-1" x2="-19" y2="4" stroke="${leg}" stroke-width="1.3" stroke-linecap="round"/>`;
+    s += `<line x1="8" y1="12" x2="16" y2="-16" stroke="#8a5a30" stroke-width="2" stroke-linecap="round"/>`;
+    if (kind==="summoner"){
+      s += `<path d="M-16 -12 A9 9 0 0 1 2 -13 L-4 -16 L-16 -16 Z" fill="${robeColor}" stroke="${outline}" stroke-width="0.6"/>`;
+      s += `<circle cx="16" cy="-17" r="3.4" fill="${trim}" opacity="0.85"/><circle cx="16" cy="-17" r="6" fill="${trim}" opacity="0.3"/>`;
+    } else if (kind==="wizard"){
+      s += `<path d="M-16 -9 L-4 -26 L4 -10 Z" fill="${robeColor}" stroke="${outline}" stroke-width="0.8"/>`;
+      s += `<circle cx="-4" cy="-26" r="1.6" fill="${trim}"/>`;
+      s += `<path d="M12 -18 l4 -6 l-2 4 l4 -2 l-6 8 z" fill="${trim}"/>`;
+    } else if (kind==="necromancer"){
+      s += `<path d="M-17 -12 A9 9 0 0 1 1 -13 L-5 -17 L-17 -17 Z" fill="${robeColor}" stroke="${outline}" stroke-width="0.6"/>`;
+      s += `<circle cx="16" cy="-19" r="3.6" fill="#d8d0c0" stroke="#000" stroke-width="0.5"/>`;
+      s += `<circle cx="14.6" cy="-19.6" r="0.7" fill="#000"/><circle cx="17.4" cy="-19.6" r="0.7" fill="#000"/>`;
+    } else if (kind==="queen"){
+      s += `<path d="M-19 -10 l3 -7 l3 5 l3 -7 l3 5 l3 -7 l3 7 z" fill="#ffd76a" stroke="#b8860b" stroke-width="0.6"/>`;
+      s += `<path d="M4 -8 L16 -18 L10 -4 Z" fill="${trim}" opacity="0.75"/><path d="M4 4 L16 14 L10 2 Z" fill="${trim}" opacity="0.75"/>`;
+      s += `<circle cx="16" cy="-17" r="3.8" fill="${trim}" opacity="0.9"/><circle cx="16" cy="-17" r="6.5" fill="${trim}" opacity="0.3"/>`;
+    }
+    return s;
+  }
+
+  // ---- centipede: 8 small segments, two legs per segment, two antennae on head ----
+  if (f.seg){
+    const segN = 8, spacing = 4.3, startX = (segN-1)*spacing/2;
+    for (let i=0;i<segN;i++){
+      const cx = startX - i*spacing;
+      const isHead = i===segN-1;
+      const r = isHead ? 5.2 : 4.1;
+      s += `<line x1="${cx.toFixed(1)}" y1="0" x2="${(cx-1.4).toFixed(1)}" y2="8" stroke="${leg}" stroke-width="1.3" stroke-linecap="round"/>`;
+      s += `<line x1="${cx.toFixed(1)}" y1="0" x2="${(cx-1.4).toFixed(1)}" y2="-8" stroke="${leg}" stroke-width="1.3" stroke-linecap="round"/>`;
+      s += `<circle cx="${cx.toFixed(1)}" cy="0" r="${r}" fill="${col}" stroke="${outline}" stroke-width="1"/>`;
+      if (isHead){
+        const eyeCol = f.eye ? "#e0563b" : "#12100c";
+        s += `<circle cx="${(cx-2.2).toFixed(1)}" cy="-2" r="1.3" fill="${eyeCol}"/><circle cx="${(cx-2.2).toFixed(1)}" cy="2" r="1.3" fill="${eyeCol}"/>`;
+        s += `<line x1="${(cx-3).toFixed(1)}" y1="-2.5" x2="${(cx-9).toFixed(1)}" y2="-8" stroke="${leg}" stroke-width="1.3" stroke-linecap="round"/>`;
+        s += `<line x1="${(cx-3).toFixed(1)}" y1="2.5" x2="${(cx-9).toFixed(1)}" y2="8" stroke="${leg}" stroke-width="1.3" stroke-linecap="round"/>`;
+      }
+    }
+    return s;
+  }
+
+  // ---- small whale: rounded body + tail fluke, no eyes, two antennae ----
+  if (f.whaleBody){
+    s += `<path d="M-14 0 Q-9 -9 5 -8 Q16 -6 18 0 Q16 6 5 8 Q-9 9 -14 0 Z" fill="${col}" stroke="${outline}" stroke-width="1.1"/>`;
+    s += `<path d="M16 -2 L26 -8 L20 0 L26 8 L16 2 Z" fill="${col}" stroke="${outline}" stroke-width="1"/>`;
+    s += `<path d="M-2 -8 Q0 -12 2 -8" stroke="${acc}" stroke-width="1.3" fill="none"/>`;
+    s += `<line x1="-12" y1="-4" x2="-18" y2="-10" stroke="${leg}" stroke-width="1.3" stroke-linecap="round"/>`;
+    s += `<line x1="-12" y1="4" x2="-18" y2="10" stroke="${leg}" stroke-width="1.3" stroke-linecap="round"/>`;
+    return s;
+  }
+
+  // ---- planet consumer: single round body, big head, big mouth, two antennae ----
+  if (f.singleBody){
+    const r = 13*thick;
+    s += `<circle cx="-2" cy="0" r="${r}" fill="${col}" stroke="${outline}" stroke-width="1.2"/>`;
+    s += `<path d="M-15 -6 Q-22 0 -15 6 L-6 4 Q-11 0 -6 -4 Z" fill="#2a0f0f" stroke="${outline}" stroke-width="0.8"/>`;
+    for (const ty of [-3,0,3]) s += `<line x1="-14.5" y1="${ty-1}" x2="-14.5" y2="${ty+1}" stroke="#fff" stroke-width="1"/>`;
+    const eyeCol = f.eye ? "#e0563b" : "#12100c";
+    s += `<circle cx="-6" cy="-8" r="2" fill="${eyeCol}"/><circle cx="3" cy="-9" r="2" fill="${eyeCol}"/>`;
+    s += `<line x1="-4" y1="-12" x2="-9" y2="-20" stroke="${leg}" stroke-width="1.5" stroke-linecap="round"/>`;
+    s += `<line x1="3" y1="-13" x2="5" y2="-21" stroke="${leg}" stroke-width="1.5" stroke-linecap="round"/>`;
+    return s;
+  }
+
+  // legs (generic tripod, skipped for body plans that draw their own)
+  const ll = f.legs ? 20 : 10;
+  for (const bx of [8,0,-6]){
+    s += `<line x1="${bx}" y1="0" x2="${bx-3}" y2="${ll}" stroke="${leg}" stroke-width="1.6" stroke-linecap="round"/>`;
+    s += `<line x1="${bx}" y1="0" x2="${bx-3}" y2="${-ll}" stroke="${leg}" stroke-width="1.6" stroke-linecap="round"/>`;
+  }
+  if (f.wings){
+    s += `<ellipse cx="2" cy="-9" rx="13" ry="8" fill="${acc}" opacity="0.5" transform="rotate(-18 2 -9)"/>`;
+    s += `<ellipse cx="2" cy="9" rx="13" ry="8" fill="${acc}" opacity="0.5" transform="rotate(18 2 9)"/>`;
+  }
+  if (f.dinoWings){
+    s += `<path d="M2 -6 L15 -15 L9 -3 Z" fill="${acc}" opacity="0.78" stroke="${outline}" stroke-width="0.6"/>`;
+    s += `<path d="M2 6 L15 15 L9 3 Z" fill="${acc}" opacity="0.78" stroke="${outline}" stroke-width="0.6"/>`;
+  }
+  if (f.fin){ s += `<path d="M12 -2 L22 -12 L18 0 L22 12 L12 2 Z" fill="${acc}" opacity="0.7"/>`; }
+  if (f.tent){ for(const dy of [-6,0,6]) s += `<path d="M16 ${dy} q10 4 6 ${dy>0?12:(dy<0?-12:4)}" stroke="${acc}" stroke-width="1.6" fill="none"/>`; }
+
+  // ---- full robot body (mecha ant) ----
+  if (f.robot){
+    const metal = "#9aa0a8", dark = "#4a4e56", visor = "#e0392b";
+    s += `<rect x="-3" y="-8" width="21" height="16" rx="3" fill="${metal}" stroke="${outline}" stroke-width="1.1"/>`;
+    s += `<rect x="1" y="-4" width="7" height="8" fill="${dark}" opacity="0.5"/>`;
+    s += `<rect x="-9" y="-6" width="9" height="12" rx="2" fill="${metal}" stroke="${outline}" stroke-width="1.1"/>`;
+    s += `<rect x="-17" y="-5.5" width="9" height="11" rx="2" fill="${metal}" stroke="${outline}" stroke-width="1.1"/>`;
+    s += `<rect x="-16" y="-2.6" width="7" height="5.2" rx="1" fill="${visor}"/>`;
+    s += `<line x1="-13" y1="-5.5" x2="-13" y2="-13" stroke="${dark}" stroke-width="1.6"/><circle cx="-13" cy="-14" r="1.8" fill="${visor}"/>`;
+    s += `<line x1="-15" y1="1" x2="-20" y2="4" stroke="${dark}" stroke-width="2" stroke-linecap="square"/>`;
+    s += `<line x1="-15" y1="-1" x2="-20" y2="-4" stroke="${dark}" stroke-width="2" stroke-linecap="square"/>`;
+    s += `<rect x="-1" y="-2" width="4" height="4" fill="${acc}" opacity="0.8"/>`;
+    return s;
+  }
+
+  // body: abdomen, thorax, head (facing -x)
+  s += `<ellipse cx="${9*thick}" cy="0" rx="${11*thick}" ry="${8*thick}" fill="${col}" stroke="${outline}" stroke-width="1.1"/>`;
+  s += `<ellipse cx="0" cy="0" rx="${6*thick}" ry="${6*thick}" fill="${col}" stroke="${outline}" stroke-width="1.1"/>`;
+  s += `<circle cx="${-9}" cy="0" r="${6*thick}" fill="${col}" stroke="${outline}" stroke-width="1.1"/>`;
+  if (f.mecha){ s += `<rect x="-2" y="-9" width="10" height="18" rx="2" fill="${acc}" opacity="0.55"/>`; }
+  if (f.corrupted){
+    s += `<path d="M4 -4 L8 2 L2 4" stroke="#7a2fae" stroke-width="1.2" fill="none" opacity="0.85"/>`;
+    s += `<circle cx="10" cy="-3" r="1.6" fill="#7a2fae" opacity="0.75"/><circle cx="-3" cy="4" r="1.3" fill="#4a1a66" opacity="0.75"/>`;
+  }
+  // eyes
+  const eyeCol = f.eye ? "#e0563b" : "#12100c";
+  s += `<circle cx="-11" cy="-2.5" r="1.7" fill="${eyeCol}"/><circle cx="-11" cy="2.5" r="1.7" fill="${eyeCol}"/>`;
+  if (f.eye) s += `<circle cx="-11" cy="-2.5" r="3" fill="${eyeCol}" opacity="0.4"/><circle cx="-11" cy="2.5" r="3" fill="${eyeCol}" opacity="0.4"/>`;
+  if (f.demon){
+    s += `<path d="M-11 -5 L-14 -13 L-8 -7 Z" fill="#3a0a0a" stroke="${outline}" stroke-width="0.6"/>`;
+    s += `<path d="M-11 5 L-14 13 L-8 7 Z" fill="#3a0a0a" stroke="${outline}" stroke-width="0.6"/>`;
+    s += `<path d="M4 -7 L15 -18 L10 -5 Z" fill="#5a0f0f" opacity="0.82"/>`;
+    s += `<path d="M4 7 L15 18 L10 5 Z" fill="#5a0f0f" opacity="0.82"/>`;
+  }
+  // antennae
+  const aDx = f.shortAntennae ? -4 : -7;
+  const aDy = f.shortAntennae ? 3 : 6;
+  s += `<line x1="-13" y1="-3" x2="${-13+aDx}" y2="${-3-aDy}" stroke="${leg}" stroke-width="1.4" stroke-linecap="round"/>`;
+  s += `<line x1="-13" y1="3" x2="${-13+aDx}" y2="${3+aDy}" stroke="${leg}" stroke-width="1.4" stroke-linecap="round"/>`;
+  // mandibles
+  if (f.mand){
+    s += `<path d="M-15 -3 q-9 -1 -12 -8" stroke="${acc}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`;
+    s += `<path d="M-15 3 q-9 1 -12 8" stroke="${acc}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`;
+  } else {
+    s += `<line x1="-15" y1="-2" x2="-19" y2="-4" stroke="${leg}" stroke-width="1.6" stroke-linecap="round"/>`;
+    s += `<line x1="-15" y1="2" x2="-19" y2="4" stroke="${leg}" stroke-width="1.6" stroke-linecap="round"/>`;
+  }
+  if (f.helmet){ s += `<path d="M-15 -3 A6 6 0 0 1 -3 -3 L-3 -6 L-15 -6 Z" fill="#f2c94c"/><rect x="-15" y="-6" width="12" height="2.4" fill="#e0a020"/>`; }
+  if (f.crown){ s += `<path d="M-14 -8 l3 -6 l3 5 l3 -6 l3 6 z" fill="#ffd76a" stroke="#b8860b" stroke-width="0.6"/>`; }
+  if (f.camoHat){
+    s += `<path d="M-15 -3 A6 6 0 0 1 -3 -3 L-3 -6 L-15 -6 Z" fill="#4a5a34"/>`;
+    s += `<circle cx="-12" cy="-4.4" r="1.3" fill="#6b7a4a" opacity="0.85"/><circle cx="-7.5" cy="-5" r="1.1" fill="#33401f" opacity="0.85"/><circle cx="-9.5" cy="-3.6" r="0.9" fill="#5a6a3a" opacity="0.85"/>`;
+  }
+  if (f.badge){ s += `<circle cx="5" cy="1.5" r="1.8" fill="#f2c94c" stroke="#8a6d1a" stroke-width="0.6"/>`; }
+  return s;
+}
+
+function bugArt(b){
+  const col = b.color, leg = b.leg;
+  let s = "";
+  const draw = {
+    termite(){
+      let a=`<line x1="-4" y1="0" x2="-12" y2="-6" stroke="${leg}" stroke-width="1.3"/><line x1="-4" y1="0" x2="-12" y2="6" stroke="${leg}" stroke-width="1.3"/>`;
+      for(const bx of [6,0,-4]){ a+=`<line x1="${bx}" y1="0" x2="${bx-2}" y2="9" stroke="${leg}" stroke-width="1.4"/><line x1="${bx}" y1="0" x2="${bx-2}" y2="-9" stroke="${leg}" stroke-width="1.4"/>`; }
+      a+=`<ellipse cx="7" cy="0" rx="12" ry="6" fill="${col}"/><circle cx="-6" cy="0" r="5" fill="${col}"/>`;
+      a+=`<circle cx="-8" cy="-2" r="1.3" fill="#3a2e1a"/><circle cx="-8" cy="2" r="1.3" fill="#3a2e1a"/>`;
+      return a;
+    },
+    caterpillar(){
+      let a="";
+      for(let i=0;i<6;i++){ const x=12-i*5; a+=`<circle cx="${x}" cy="0" r="6.5" fill="${i%2?col:leg}"/>`; a+=`<line x1="${x}" y1="6" x2="${x}" y2="10" stroke="${leg}" stroke-width="1.4"/>`; }
+      a+=`<circle cx="-18" cy="0" r="7" fill="${col}"/><circle cx="-20" cy="-2.5" r="1.6" fill="#123"/><circle cx="-20" cy="2.5" r="1.6" fill="#123"/>`;
+      return a;
+    },
+    worm(){
+      let a=`<path d="M14 0 q-7 -8 -14 0 q-7 8 -14 0" stroke="${col}" stroke-width="10" fill="none" stroke-linecap="round"/>`;
+      a+=`<circle cx="-14" cy="-1" r="1.4" fill="#7a3a4a"/>`;
+      return a;
+    },
+    spider(){
+      let a="";
+      for(let i=0;i<4;i++){ const ay=-12+i*8; a+=`<path d="M0 0 Q-14 ${ay} -18 ${ay+ (i<2?-4:4)}" stroke="${leg}" stroke-width="1.6" fill="none"/><path d="M0 0 Q14 ${ay} 18 ${ay+(i<2?-4:4)}" stroke="${leg}" stroke-width="1.6" fill="none"/>`; }
+      a+=`<circle cx="0" cy="0" r="9" fill="${col}"/><circle cx="-7" cy="0" r="5" fill="${col}"/>`;
+      a+=`<circle cx="-8" cy="-2" r="1.4" fill="#c0392b"/><circle cx="-8" cy="2" r="1.4" fill="#c0392b"/>`;
+      return a;
+    },
+    cockroach(){
+      let a="";
+      for(const bx of [6,0,-6]){ a+=`<line x1="${bx}" y1="0" x2="${bx-4}" y2="10" stroke="${leg}" stroke-width="1.5"/><line x1="${bx}" y1="0" x2="${bx-4}" y2="-10" stroke="${leg}" stroke-width="1.5"/>`; }
+      a+=`<ellipse cx="4" cy="0" rx="14" ry="9" fill="${col}"/><ellipse cx="6" cy="0" rx="9" ry="7" fill="#4a3018" opacity="0.5"/>`;
+      a+=`<circle cx="-10" cy="0" r="4.5" fill="${col}"/><line x1="-13" y1="-2" x2="-20" y2="-8" stroke="${leg}" stroke-width="1.3"/><line x1="-13" y1="2" x2="-20" y2="8" stroke="${leg}" stroke-width="1.3"/>`;
+      return a;
+    },
+    grasshopper(){
+      let a=`<path d="M8 4 L20 16 L14 16" stroke="${leg}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`;
+      a+=`<path d="M8 -4 L20 -16 L14 -16" stroke="${leg}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`;
+      a+=`<ellipse cx="6" cy="0" rx="13" ry="6" fill="${col}"/><circle cx="-8" cy="0" r="5" fill="${col}"/>`;
+      a+=`<line x1="-11" y1="-2" x2="-19" y2="-8" stroke="${leg}" stroke-width="1.3"/><line x1="-11" y1="2" x2="-19" y2="8" stroke="${leg}" stroke-width="1.3"/>`;
+      a+=`<circle cx="-9" cy="-2" r="1.3" fill="#123"/><circle cx="-9" cy="2" r="1.3" fill="#123"/>`;
+      return a;
+    },
+    frog(){
+      let a=`<ellipse cx="4" cy="4" rx="15" ry="11" fill="${col}"/>`;
+      a+=`<path d="M14 10 q8 4 4 12" stroke="${leg}" stroke-width="3" fill="none" stroke-linecap="round"/>`;
+      a+=`<circle cx="-8" cy="-6" r="4" fill="${col}"/><circle cx="-8" cy="-7" r="2" fill="#fff"/><circle cx="-8" cy="-7" r="1" fill="#123"/>`;
+      a+=`<circle cx="-2" cy="-8" r="4" fill="${col}"/><circle cx="-2" cy="-9" r="2" fill="#fff"/><circle cx="-2" cy="-9" r="1" fill="#123"/>`;
+      return a;
+    },
+    lizard(){
+      let a=`<path d="M16 0 q10 0 18 6" stroke="${col}" stroke-width="4" fill="none" stroke-linecap="round"/>`;
+      a+=`<ellipse cx="4" cy="0" rx="16" ry="7" fill="${col}"/><circle cx="-12" cy="0" r="6" fill="${col}"/>`;
+      for(const bx of [8,-4]){ a+=`<line x1="${bx}" y1="4" x2="${bx-4}" y2="12" stroke="${leg}" stroke-width="2"/><line x1="${bx}" y1="-4" x2="${bx-4}" y2="-12" stroke="${leg}" stroke-width="2"/>`; }
+      a+=`<circle cx="-14" cy="-2" r="1.5" fill="#123"/>`;
+      return a;
+    },
+    bird(){
+      let a=`<path d="M2 -4 L14 -16 L10 -2 Z" fill="${leg}" opacity="0.8"/>`;
+      a+=`<ellipse cx="2" cy="2" rx="14" ry="10" fill="${col}"/><circle cx="-11" cy="-4" r="6" fill="${col}"/>`;
+      a+=`<path d="M-16 -4 l-8 2 l8 3 z" fill="#f2c94c"/>`;
+      a+=`<circle cx="-12" cy="-5" r="1.6" fill="#123"/>`;
+      a+=`<path d="M12 8 q10 2 14 10" stroke="${leg}" stroke-width="3" fill="none"/>`;
+      return a;
+    },
+    anteater(){
+      let a = "";
+      // bushy tail arcing up over the back
+      a += `<path d="M18 5 q22 -6 24 -24 q6 16 -8 26 q9 -3 12 -15 q0 19 -20 20 Z" fill="${col}"/>`;
+      // rounded body
+      a += `<ellipse cx="4" cy="5" rx="18" ry="12" fill="${col}"/>`;
+      // long tapering snout
+      a += `<path d="M-13 1 Q-29 0 -37 3 Q-29 6 -13 7 Z" fill="${col}"/>`;
+      // tongue flick
+      a += `<line x1="-36" y1="3" x2="-41" y2="3" stroke="#c04a4a" stroke-width="1.6" stroke-linecap="round"/>`;
+      // ears
+      a += `<ellipse cx="-5" cy="-8" rx="3.2" ry="4.4" fill="${col}"/>`;
+      a += `<ellipse cx="3" cy="-9" rx="3.2" ry="4.4" fill="${col}"/>`;
+      // eye
+      a += `<circle cx="-12" cy="-2" r="1.6" fill="#1c1508"/>`;
+      // clawed legs
+      for (const bx of [11,-3]){
+        a += `<line x1="${bx}" y1="14" x2="${bx-2}" y2="24" stroke="${leg}" stroke-width="3.4" stroke-linecap="round"/>`;
+        a += `<path d="M${bx-6} 24 l1 4 M${bx-3} 24 l0 4 M${bx} 24 l-1 4" stroke="${leg}" stroke-width="1.3" stroke-linecap="round"/>`;
+      }
+      return a;
+    },
+    armadillo(){
+      let a = "";
+      a += `<ellipse cx="4" cy="0" rx="16" ry="9" fill="${col}"/>`;
+      for (const bx of [-6,0,6,12]) a += `<path d="M${bx} -9 Q${bx+3} 0 ${bx} 9" stroke="${leg}" stroke-width="1.2" fill="none" opacity="0.6"/>`;
+      a += `<circle cx="-14" cy="0" r="6" fill="${col}"/>`;
+      a += `<circle cx="-17" cy="-1.5" r="1.3" fill="#2a2015"/>`;
+      for (const bx of [8,0,-8]){ a += `<line x1="${bx}" y1="7" x2="${bx-2}" y2="13" stroke="${leg}" stroke-width="1.8" stroke-linecap="round"/>`; }
+      a += `<path d="M18 2 q9 4 6 13" stroke="${leg}" stroke-width="2.8" fill="none" stroke-linecap="round"/>`;
+      return a;
+    },
+    theend(){
+      let a = "";
+      a += `<circle cx="0" cy="0" r="23" fill="#050505"/>`;
+      a += `<circle cx="0" cy="0" r="23" fill="none" stroke="#8a1f1f" stroke-width="1.6" opacity="0.85"/>`;
+      a += `<circle cx="0" cy="0" r="15" fill="none" stroke="#5a1414" stroke-width="1" opacity="0.6"/>`;
+      a += `<circle cx="0" cy="0" r="6.5" fill="#e0392b"/>`;
+      a += `<circle cx="0" cy="0" r="11" fill="none" stroke="#e0392b" stroke-width="1" opacity="0.5"/>`;
+      a += `<path d="M-23 0 L-33 -11 M-23 0 L-33 11 M23 0 L33 -11 M23 0 L33 11 M0 -23 L-11 -33 M0 -23 L11 -33 M0 23 L-11 33 M0 23 L11 33" stroke="#000" stroke-width="3" stroke-linecap="round"/>`;
+      return a;
+    },
+    bugman(){
+      let a = "";
+      a += `<path d="M-10 14 Q-14 -4 -6 -16 Q0 -22 8 -16 Q14 -4 12 14 Z" fill="${col}"/>`;
+      a += `<circle cx="-2" cy="-20" r="7" fill="${col}"/>`;
+      a += `<rect x="-8" y="-33" width="12" height="10" fill="#1a1a1a"/><rect x="-10" y="-24" width="16" height="3" fill="#1a1a1a"/>`;
+      a += `<circle cx="-4" cy="-21" r="1.4" fill="#e0392b"/><circle cx="1" cy="-21" r="1.4" fill="#e0392b"/>`;
+      for (const by of [-6,2,10]){
+        a += `<line x1="10" y1="${by}" x2="22" y2="${by-6}" stroke="${leg}" stroke-width="1.8"/>`;
+        a += `<line x1="-8" y1="${by}" x2="-20" y2="${by-6}" stroke="${leg}" stroke-width="1.8"/>`;
+      }
+      a += `<line x1="14" y1="10" x2="24" y2="-18" stroke="#8a5a30" stroke-width="2.2" stroke-linecap="round"/>`;
+      a += `<circle cx="25" cy="-19" r="3" fill="#e0392b" opacity="0.85"/>`;
+      return a;
+    },
+    termiteking(){
+      let a=`<line x1="-4" y1="0" x2="-14" y2="-7" stroke="${leg}" stroke-width="1.6"/><line x1="-4" y1="0" x2="-14" y2="7" stroke="${leg}" stroke-width="1.6"/>`;
+      for(const bx of [7,0,-5]){ a+=`<line x1="${bx}" y1="0" x2="${bx-2}" y2="11" stroke="${leg}" stroke-width="1.7"/><line x1="${bx}" y1="0" x2="${bx-2}" y2="-11" stroke="${leg}" stroke-width="1.7"/>`; }
+      a+=`<ellipse cx="8" cy="0" rx="15" ry="8" fill="${col}"/><circle cx="-7" cy="0" r="6.5" fill="${col}"/>`;
+      a+=`<circle cx="-9.5" cy="-2.4" r="1.6" fill="#3a2e1a"/><circle cx="-9.5" cy="2.4" r="1.6" fill="#3a2e1a"/>`;
+      return a;
+    },
+    vaccume(){
+      const metal = col, dark = "#22242a", hilite = "#c8ccd4";
+      let a = "";
+      // hose reaching forward toward -x like a proboscis
+      a += `<path d="M-14 -1 Q-27 -6 -35 -3" stroke="${dark}" stroke-width="4.4" fill="none" stroke-linecap="round"/>`;
+      a += `<ellipse cx="-36" cy="-3" rx="4" ry="3" fill="${dark}"/>`;
+      // canister body on little wheels
+      a += `<rect x="-7" y="-13" width="27" height="26" rx="6" fill="${metal}" stroke="#111" stroke-width="1.2"/>`;
+      a += `<rect x="-4" y="-9" width="10" height="18" rx="3" fill="${hilite}" opacity="0.35"/>`;
+      a += `<circle cx="0" cy="15" r="4.2" fill="${dark}"/><circle cx="15" cy="15" r="4.2" fill="${dark}"/>`;
+      // glowing red dial-eye
+      a += `<circle cx="12" cy="-4" r="3.2" fill="#e0392b"/><circle cx="12" cy="-4" r="5.4" fill="#e0392b" opacity="0.35"/>`;
+      // suction swirl marks near the nozzle
+      a += `<path d="M-31 -8 q-4 4 -9 2 M-31 3 q-4 -2 -9 0" stroke="${hilite}" stroke-width="1" fill="none" opacity="0.5"/>`;
+      return a;
+    },
+    tick(){
+      let a="";
+      for(let i=0;i<4;i++){ const ay=-9+i*6; a+=`<path d="M-2 0 Q-12 ${ay} -16 ${ay+(i<2?-3:3)}" stroke="${leg}" stroke-width="1.4" fill="none"/><path d="M-2 0 Q10 ${ay} 14 ${ay+(i<2?-3:3)}" stroke="${leg}" stroke-width="1.4" fill="none"/>`; }
+      a+=`<ellipse cx="0" cy="0" rx="11" ry="9.5" fill="${col}"/><circle cx="-9" cy="0" r="3.4" fill="${col}"/>`;
+      a+=`<line x1="-12" y1="0" x2="-16" y2="0" stroke="${leg}" stroke-width="1.6"/>`;
+      a+=`<circle cx="-9" cy="-1.5" r="1" fill="#1a0f08"/><circle cx="-9" cy="1.5" r="1" fill="#1a0f08"/>`;
+      return a;
+    },
+    bush(){
+      let a="";
+      a += `<ellipse cx="0" cy="7" rx="16" ry="5" fill="${leg}" opacity="0.35"/>`;
+      a += `<circle cx="-8" cy="-2" r="10" fill="${col}"/><circle cx="6" cy="-6" r="12" fill="${col}"/><circle cx="10" cy="4" r="9" fill="${col}"/><circle cx="-4" cy="8" r="8" fill="${col}"/>`;
+      a += `<circle cx="-8" cy="-2" r="10" fill="none" stroke="${leg}" stroke-width="0.8" opacity="0.5"/><circle cx="6" cy="-6" r="12" fill="none" stroke="${leg}" stroke-width="0.8" opacity="0.5"/>`;
+      a += `<circle cx="0" cy="-2" r="2.2" fill="#c0392b"/><circle cx="8" cy="-8" r="1.9" fill="#c0392b"/><circle cx="-6" cy="4" r="1.7" fill="#c0392b"/>`;
+      return a;
+    },
+  };
+  let art = (draw[b.shape] || draw.termite)();
+  if (b.crown){ art += `<path d="M-17 -10 l2.5 -6 l2.5 5 l2.5 -6 l2.5 5 l2.5 -6 l2.5 6 z" fill="#ffd76a" stroke="#b8860b" stroke-width="0.6"/>`; }
+  if (b.widowMark){ art += `<path d="M2 -4 L6 0 L2 4 L-2 0 Z" fill="#c0392b"/>`; }
+  return art;
+}
+
+/* ---------------- STATE ---------------- */
+let money = 100;
+let xp = 0;
+let antCoins = 0;
+
+// Money-capacity upgrade (permanent, bought with Ant Coins at Home Base). Level 1 is the free default.
+let moneyCapLevel = 1;
+const MONEY_CAP_MAX_LEVEL = 20;
+function moneyCapFor(level){ return Math.round(1000 * Math.pow(1.5, level-1)); }
+function moneyCapCost(level){ return Math.round(100 * Math.pow(1.5, level-1)); } // cost to go from `level` -> `level+1`
+function addMoney(amt){ money = Math.min(moneyCapFor(moneyCapLevel), money + amt); updateMoney(); }
+
+// Income-rate upgrade (permanent, bought with Ant Coins at Home Base). Level 1 is the free default (10c/1s).
+let incomeLevel = 1;
+const INCOME_MAX_LEVEL = 10;
+const INCOME_LEVELS = [null,
+  {amt:10,  ms:1000},
+  {amt:25,  ms:2000},
+  {amt:25,  ms:1000},
+  {amt:50,  ms:2000},
+  {amt:50,  ms:1000},
+  {amt:100, ms:2000},
+  {amt:100, ms:1000},
+  {amt:200, ms:2000},
+  {amt:200, ms:1000},
+  {amt:250, ms:1000} ];
+function incomeCost(level){ return 1000*level; } // cost to go from `level` -> `level+1`: 1000, 2000, ... 9000
+let incomeAccumMs = 0;
+
+// Game speed toggle (1x / 2x). Scales movement, attack cadence, income accrual, cannon reload, wave pacing.
+let gameSpeed = 1;
+let gameClock = 0;
+
+let runActive = false;
+let paused = false;
+let pauseStartedAt = 0;
+function setPaused(v){
+  if (v === paused) return;
+  paused = v;
+  if (paused){ pauseStartedAt = performance.now(); }
+  else { waveState.pausedMs = (waveState.pausedMs||0) + (performance.now()-pauseStartedAt); }
+}
+const svg = document.getElementById("field");
+const moneyEl = document.getElementById("money");
+const xpEl = document.getElementById("xpDisplay");
+const coinEl = document.getElementById("coinHud");
+const bannerEl = document.getElementById("banner");
+let entities = [];
+const antState = {};     // id -> currently selected level to spawn (1-indexed)
+const antUnlocked = {};  // id -> highest level unlocked so far — mirrors homeUnlocked, kept in sync
+const homeUnlocked = {}; // id -> PERMANENT level per line (1-indexed), persists across runs/battles
+const levelMilestone = {}; // id -> true forever once that line has been leveled to 20+ at least once
+const maxLevelReached = {}; // id -> true forever once that line has been leveled all the way to its max
+let bestLoopReached = 0; // highest Endless Battle loop (ngPlusLoop) ever reached, for the progress %
+let soundMuted = false;
+let antSlotsUnlocked = false; // true forever once the Virginia Battle Selection round has been beaten
+const antCardRefreshers = {};
+const antCardEls = {};
+const MAX_EQUIPPED = 10;
+// Only the base Ant line is available from the start — every other line has to be permanently
+// unlocked with Ant Coins at the Home Base (line.unlockCost) before it can even be equipped.
+const lineUnlocked = {}; ANT_LINES.forEach(l=>{ lineUnlocked[l.id] = (l.id==="ant"); });
+let equipped = new Set(["ant"]); // default: only the base Ant is equipped
+
+// Battle Selection rounds — each round only unlocks once the one before it has been cleared
+// (round 0 is always open). Add more rounds here and the "beat the previous one" chain covers them automatically.
+const ROUNDS = [
+  { id:"texas", name:"Texas", emoji:"🤠", bugPool:["termite"], spawnMs:2000, bugBaseHp:5000 },
+  { id:"maine", name:"Maine", emoji:"🦞", bugPool:["termite"], spawnMs:1000, bugBaseHp:5000 },
+  { id:"california", name:"California", emoji:"🌴", bugPool:["termite","caterpillar"], spawnMsMin:1800, spawnMsMax:2800, bugBaseHp:5000 },
+  { id:"ohio", name:"Ohio", emoji:"🌽", bugPool:["termite","caterpillar","worm"], spawnMsMin:1800, spawnMsMax:2800, bugBaseHp:5000 },
+  // 1.3x faster than Ohio's 1800–2800ms range (1800/1.3, 2800/1.3)
+  { id:"alaska", name:"Alaska", emoji:"🧊", bugPool:["termite","caterpillar","worm"], spawnMsMin:1385, spawnMsMax:2154, bugBaseHp:7500 },
+  { id:"georgia", name:"Georgia", emoji:"🍑", bugPool:["termite","caterpillar","worm","spider"], spawnMsMin:1800, spawnMsMax:2800, bugBaseHp:7500 },
+  { id:"nevada", name:"Nevada", emoji:"🎰", bugPool:["termite","caterpillar","worm","spider"], spawnMsMin:1800, spawnMsMax:2800, bugBaseHp:10000 },
+  { id:"vermont", name:"Vermont", emoji:"🍁", bugPool:["termite","caterpillar","worm","spider"], spawnMsMin:1800, spawnMsMax:2800, bugBaseHp:10000, oneTimeSpawns:["grasshopper"] },
+  { id:"florida", name:"Florida", emoji:"🐊", bugPool:["termite","caterpillar","worm","spider","cockroach"], spawnMsMin:1800, spawnMsMax:2800, bugBaseHp:10000 },
+  { id:"montana", name:"Montana", emoji:"🏔️", bugPool:["termite","caterpillar","worm","spider","cockroach"], spawnMsMin:1800, spawnMsMax:2800, bugBaseHp:10000 },
+  { id:"newyork", name:"New York", emoji:"🗽", bugPool:["termite","caterpillar","worm","spider","cockroach","grasshopper"], spawnMsMin:1800, spawnMsMax:2800, bugBaseHp:10000 },
+  { id:"kansas", name:"Kansas", emoji:"🌾", bugPool:["termite","caterpillar","worm","spider","cockroach","grasshopper"], spawnMsMin:1800, spawnMsMax:2800, bugBaseHp:10000 },
+  { id:"hawaii", name:"Hawaii", emoji:"🌺", bugPool:["termite","caterpillar","worm","spider","cockroach","grasshopper"], spawnMsMin:1800, spawnMsMax:2800, bugBaseHp:10000 },
+  { id:"organ", name:"Organ", emoji:"🎹", bugPool:["termite","caterpillar","worm","spider","cockroach","grasshopper"], spawnMsMin:1800, spawnMsMax:2800, bugBaseHp:10000, oneTimeSpawns:["frog"] },
+  { id:"michigan", name:"Michigan", emoji:"🚗", bugPool:["termite","caterpillar","worm","spider","cockroach","grasshopper","frog"], spawnMsMin:1800, spawnMsMax:2800, bugBaseHp:10000 },
+  { id:"alabama", name:"Alabama", emoji:"🏈", bugPool:["termite","caterpillar","worm","spider","cockroach","grasshopper","frog"], spawnMs:1000, bugBaseHp:15000 },
+  { id:"colorado", name:"Colorado", emoji:"⛰️", bugPool:["termite","caterpillar","worm","spider","cockroach","grasshopper","frog","lizard"], spawnMs:1000, bugBaseHp:15000 },
+  { id:"louisiana", name:"Louisiana", emoji:"🎷", bugPool:["termite","caterpillar","worm","spider","cockroach","grasshopper","lizard"], spawnMs:1000, bugBaseHp:15000 },
+  { id:"wyoming", name:"Wyoming", emoji:"🐎", bugPool:["termite","caterpillar","worm","spider","cockroach","grasshopper","frog","lizard"], spawnMs:800, bugBaseHp:15000 },
+  { id:"virginia", name:"Virginia", emoji:"🦀", bugPool:["termite","caterpillar","worm","spider","cockroach","grasshopper","frog","lizard"], spawnMs:1000, bugBaseHp:15000, oneTimeSpawns:["bird"] },
+  { id:"idaho", name:"Idaho", emoji:"🥔", bugPool:["termite","caterpillar","worm","spider","cockroach","grasshopper","frog","lizard"], spawnMs:700, bugBaseHp:20000 },
+  { id:"tennessee", name:"Tennessee", emoji:"🎸", bugPool:["termite","caterpillar","worm","spider","cockroach","grasshopper","frog","lizard","bird"], spawnMs:1000, bugBaseHp:20000 },
+  { id:"pennsylvania", name:"Pennsylvania", emoji:"🔔", bugPool:["termite","caterpillar","worm","spider","cockroach","grasshopper","frog","lizard","bird"], spawnMs:700, bugBaseHp:20000 },
+  { id:"arizona", name:"Arizona", emoji:"🌵", bugPool:["termite","caterpillar","worm","spider","cockroach","grasshopper","frog","lizard","bird"], spawnMs:1000, bugBaseHp:20000, oneTimeSpawns:["armadillo"] },
+  { id:"wisconsin", name:"Wisconsin", emoji:"🧀", bugPool:["termite","caterpillar","worm","spider","cockroach","grasshopper","frog","lizard","bird","armadillo"], spawnMs:700, bugBaseHp:20000 },
+  { id:"mississippi", name:"Mississippi", emoji:"🌊", bugPool:["termite","caterpillar","worm","spider","cockroach","grasshopper","frog","lizard","bird","armadillo"], spawnMs:1000, bugBaseHp:25000, oneTimeSpawns:["aardvark"] },
+  { id:"utah", name:"Utah", emoji:"⛰️", bugPool:["termite","caterpillar","worm","spider","cockroach","grasshopper","frog","lizard","bird","armadillo","aardvark"], spawnMs:700, bugBaseHp:25000 },
+  { id:"northcarolina", name:"North Carolina", emoji:"🏁", bugPool:["termite","caterpillar","worm","spider","cockroach","grasshopper","frog","lizard","bird","armadillo","aardvark","termiteking"], spawnMs:1000, bugBaseHp:25000 },
+  { id:"nebraska", name:"Nebraska", emoji:"🌽", bugPool:["termite","caterpillar","worm","spider","cockroach","grasshopper","frog","lizard","bird","aardvark","armadillo","termiteking","kingcaterpillar","wormking","blackwidow"], spawnMs:1000, bugBaseHp:25000, oneTimeSpawns:["giantcockroach"] },
+  { id:"washington", name:"Washington", emoji:"🌲", bugPool:["termite","caterpillar","worm","spider","cockroach","grasshopper","frog","lizard","bird","aardvark","armadillo","termiteking","kingcaterpillar","wormking"], spawnMs:1000, bugBaseHp:25000 },
+  { id:"arkansas", name:"Arkansas", emoji:"💎", bugPool:["termite","caterpillar","worm","spider","cockroach","grasshopper","frog","lizard","bird","termiteking","kingcaterpillar","wormking","blackwidow","giantcockroach"], spawnMs:700, bugBaseHp:25000 },
+  { id:"massachusetts", name:"Massachusetts", emoji:"🦃", bugPool:["termite","caterpillar","worm","spider","cockroach","grasshopper","frog","lizard","bird","aardvark","armadillo","termiteking","kingcaterpillar","wormking","blackwidow","giantcockroach","kinggrasshopper"], spawnMs:1000, bugBaseHp:30000 },
+  { id:"kentucky", name:"Kentucky", emoji:"🐎", bugPool:["termite","caterpillar","worm","spider","cockroach","grasshopper","frog","lizard","bird","aardvark","armadillo","termiteking","kingcaterpillar","wormking","blackwidow","giantcockroach","kinggrasshopper"], spawnMs:700, bugBaseHp:30000 },
+  { id:"southdakota", name:"South Dakota", emoji:"🗿", bugPool:["termite","caterpillar","worm","spider","cockroach","grasshopper","frog","lizard","bird","aardvark","armadillo","termiteking","kingcaterpillar","wormking","blackwidow","giantcockroach","kinggrasshopper","toad"], spawnMs:1000, bugBaseHp:30000 },
+  { id:"connecticut", name:"Connecticut", emoji:"⚓", bugPool:["termite","caterpillar","worm","spider","cockroach","grasshopper","frog","lizard","bird","termiteking","kingcaterpillar","wormking","blackwidow","giantcockroach","kinggrasshopper","toad"], spawnMs:700, bugBaseHp:30000 },
+  { id:"oklahoma", name:"Oklahoma", emoji:"🌪️", bugPool:["termite","caterpillar","worm","spider","cockroach","grasshopper","frog","lizard","bird","aardvark","armadillo","termiteking","kingcaterpillar","wormking","blackwidow","giantcockroach","kinggrasshopper","toad","comododragon"], spawnMs:1000, bugBaseHp:30000 },
+  { id:"indiana", name:"Indiana", emoji:"🏎️", bugPool:["termite","caterpillar","worm","spider","cockroach","grasshopper","frog","lizard","bird","aardvark","armadillo","termiteking","kingcaterpillar","blackwidow","giantcockroach","kinggrasshopper","toad","comododragon","koribustard","kingarmadillo"], spawnMs:1000, bugBaseHp:35000, oneTimeSpawns:["anteater"] },
+];
+// Summer Stages — a separate round list, only playable while the Summer Event is active (see
+// updateSummerStagesButtonState). Cleared/won the same way as a normal Battle Selection round
+// (reuses startRound/winRound and the same roundsCleared map, just keyed by its own ids), but is
+// NOT chained into the main ROUNDS unlock order and doesn't count toward Endless Battle's unlock.
+const SUMMER_ROUNDS = [
+  { id:"summer1", name:"Summer 1", emoji:"☀️", bugPool:["termite","caterpillar","worm"], spawnMs:1000, bugBaseHp:100000, oneTimeSpawns:["grasshopper"] },
+  // Note: you sent two stages both named "Summer 2" back to back — I've numbered this batch
+  // Summer 2 through Summer 6 in the order you sent them, so nothing got overwritten or duplicated.
+  { id:"summer2", name:"Summer 2", emoji:"☀️", bugPool:["bugswatter"], spawnMs:500, bugBaseHp:100000000 },
+  { id:"summer3", name:"Summer 3", emoji:"☀️", bugPool:["bugswatter","bugspray"], spawnMs:1000, bugBaseHp:150000000 },
+  { id:"summer4", name:"Summer 4", emoji:"☀️", bugPool:["bugswatter","bugspray"], spawnMs:1500, bugBaseHp:200000000, oneTimeSpawns:["weedwhacker"] },
+  { id:"summer5", name:"Summer 5", emoji:"☀️", bugPool:["bugswatter","bugspray","weedwhacker"], spawnMs:1000, bugBaseHp:250000000 },
+  { id:"summer6", name:"Summer 6", emoji:"☀️", bugPool:["bugswatter","bugspray","weedwhacker"], spawnMs:1000, bugBaseHp:300000000, oneTimeSpawns:["lawnmower"] },
+];
+const roundsCleared = {}; // id -> true once that round's bug base has been destroyed
+let currentRoundId = null; // id of the round currently in progress (null = normal Endless Battle / not in a round)
+
+// Base HP upgrade (permanent, bought with Ant Coins at Home Base). Each level is 1.5x the last.
+const BASE_MAX_HP_DEFAULT = 30000;
+let baseHpLevel = 1;
+const BASE_HP_MAX_LEVEL = 6;
+const BASE_HP_COSTS = [null, 2500, 5000, 7500, 10000, 20000]; // cost to go from `level` -> `level+1`
+function baseHpFor(level){ return Math.round(BASE_MAX_HP_DEFAULT * Math.pow(1.5, level-1)); }
+function baseHpCost(level){ return BASE_HP_COSTS[level]; }
+let baseEntityRef = null;
+
+// Cannon damage upgrade (permanent, bought with Ant Coins at Home Base). Each level is 1.5x the last.
+const CANNON_DMG_DEFAULT = 6000;
+let cannonDmgLevel = 1;
+const CANNON_DMG_MAX_LEVEL = 6;
+const CANNON_DMG_COSTS = [null, 2500, 5000, 7500, 10000, 20000]; // cost to go from `level` -> `level+1`
+function cannonDmgFor(level){ return Math.round(CANNON_DMG_DEFAULT * Math.pow(1.5, level-1)); }
+function cannonDmgCost(level){ return CANNON_DMG_COSTS[level]; }
+
+// Cannon recharge upgrade (permanent, bought with Ant Coins at Home Base). Each level is 5s faster.
+const CANNON_COOLDOWN_DEFAULT = 30;
+let cannonRechargeLevel = 1;
+const CANNON_RECHARGE_MAX_LEVEL = 5;
+const CANNON_RECHARGE_COSTS = [null, 5000, 10000, 15000, 20000]; // cost to go from `level` -> `level+1`
+function cannonCooldownFor(level){ return CANNON_COOLDOWN_DEFAULT - 5*(level-1); }
+function cannonRechargeCost(level){ return CANNON_RECHARGE_COSTS[level]; }
+
+const CANNON_TARGETS = 4;
+let cannonReady = true, cannonIntervalId = null;
+
+function fmt(n){ return n.toLocaleString(); }
+function updateMoney(){ moneyEl.textContent = fmt(money) + "¢"; }
+function flashMoney(){ moneyEl.classList.add("flash"); setTimeout(()=>moneyEl.classList.remove("flash"), 260); }
+function updateXP(){ xpEl.textContent = fmt(xp) + " XP"; }
+function flashXP(){ xpEl.classList.add("flash"); setTimeout(()=>xpEl.classList.remove("flash"), 260); }
+// ---- persistent save (Ant Coins + all permanent Home Base progress survive closing the file) ----
+// collectSaveData()/applySaveData() are also reused by the multi-slot Progress system: every
+// save — the live one and every archived slot — goes through applySaveData(), which always
+// resets to fresh defaults (derived from the CURRENT code's ANT_LINES/ROUNDS) before overlaying
+// the saved fields. That's what makes anything added later (new ant lines, new rounds) show up
+// as available-but-locked on every progress you already have, old or new.
+const SAVE_KEY = "battleAntsSave_v1";
+function collectSaveData(){
+  return {
+    antCoins, moneyCapLevel, incomeLevel, baseHpLevel, cannonDmgLevel, cannonRechargeLevel,
+    homeUnlocked, lineUnlocked, equipped: Array.from(equipped), roundsCleared, levelMilestone,
+    maxLevelReached, bestLoopReached, soundMuted, antSlotsUnlocked, antSlotSpins, rareAntSlotSpins,
+    antStorage
+  };
+}
+function resetLiveStateToDefaults(){
+  antCoins = 0; moneyCapLevel = 1; incomeLevel = 1; baseHpLevel = 1; cannonDmgLevel = 1; cannonRechargeLevel = 1;
+  Object.keys(homeUnlocked).forEach(k=>delete homeUnlocked[k]);
+  Object.keys(lineUnlocked).forEach(k=>delete lineUnlocked[k]);
+  ANT_LINES.forEach(l=>{ lineUnlocked[l.id] = (l.id==="ant"); });
+  equipped = new Set(["ant"]);
+  Object.keys(roundsCleared).forEach(k=>delete roundsCleared[k]);
+  Object.keys(levelMilestone).forEach(k=>delete levelMilestone[k]);
+  Object.keys(maxLevelReached).forEach(k=>delete maxLevelReached[k]);
+  bestLoopReached = 0;
+  antSlotsUnlocked = false;
+  antSlotSpins = 0;
+  rareAntSlotSpins = 0;
+  antStorage = [];
+  // soundMuted intentionally NOT reset — it's a device preference, not game progress
+}
+function applySaveData(data){
+  resetLiveStateToDefaults();
+  if (!data) return;
+  if (typeof data.antCoins === "number") antCoins = data.antCoins;
+  if (typeof data.moneyCapLevel === "number") moneyCapLevel = data.moneyCapLevel;
+  if (typeof data.incomeLevel === "number") incomeLevel = data.incomeLevel;
+  if (typeof data.baseHpLevel === "number") baseHpLevel = data.baseHpLevel;
+  if (typeof data.cannonDmgLevel === "number") cannonDmgLevel = data.cannonDmgLevel;
+  if (typeof data.cannonRechargeLevel === "number") cannonRechargeLevel = data.cannonRechargeLevel;
+  if (data.homeUnlocked && typeof data.homeUnlocked === "object") Object.assign(homeUnlocked, data.homeUnlocked);
+  if (data.lineUnlocked && typeof data.lineUnlocked === "object") Object.assign(lineUnlocked, data.lineUnlocked);
+  if (Array.isArray(data.equipped)){
+    const valid = data.equipped.filter(id => ANT_LINES.some(l=>l.id===id));
+    if (valid.length) equipped = new Set(valid);
+  }
+  if (data.roundsCleared && typeof data.roundsCleared === "object") Object.assign(roundsCleared, data.roundsCleared);
+  if (data.levelMilestone && typeof data.levelMilestone === "object") Object.assign(levelMilestone, data.levelMilestone);
+  if (data.maxLevelReached && typeof data.maxLevelReached === "object") Object.assign(maxLevelReached, data.maxLevelReached);
+  if (typeof data.bestLoopReached === "number") bestLoopReached = data.bestLoopReached;
+  if (typeof data.soundMuted === "boolean") soundMuted = data.soundMuted;
+  if (typeof data.antSlotsUnlocked === "boolean") antSlotsUnlocked = data.antSlotsUnlocked;
+  if (typeof data.antSlotSpins === "number") antSlotSpins = data.antSlotSpins;
+  if (typeof data.rareAntSlotSpins === "number") rareAntSlotSpins = data.rareAntSlotSpins;
+  if (Array.isArray(data.antStorage)){
+    antStorage = data.antStorage.filter(e => e && typeof e.lineId === "string" && ANT_LINES.some(l=>l.id===e.lineId))
+      .map(e => ({ id: e.id || makeStorageId(), lineId: e.lineId, wonVia: e.wonVia === "rare" ? "rare" : "normal", wonAt: e.wonAt || Date.now() }));
+  }
+  // Migration: older saves cleared Virginia back when Ant Slots unlocked at global Stage 20
+  // instead, so antSlotsUnlocked never got flipped for them. Catch that up once here — same
+  // unlock + one-time starter spins a fresh Virginia clear grants — so it only ever fires once
+  // (antSlotsUnlocked becomes true immediately after, so this can't re-trigger on a later load).
+  if (!antSlotsUnlocked && roundsCleared["virginia"]){
+    antSlotsUnlocked = true;
+    antSlotSpins += 1;
+    rareAntSlotSpins += 1;
+    saveProgress();
+  }
+  // Migration: the Summer Ant gift-only line didn't exist until this save format did — if this
+  // slot's device already has a Summer Gift streak of day 45+ for the current summer, catch it
+  // up here instead of making the player wait for a fresh day-45 claim. Re-checked on every load/
+  // slot-swap, same as the Virginia migration above, so it applies correctly to every save slot.
+  if (typeof summerGiftState !== "undefined" && !lineUnlocked[SUMMER_ANT_LINE_ID] &&
+      summerGiftState.dayIndex >= SUMMER_ANT_GIFT_DAY && summerGiftState.year === new Date().getFullYear()){
+    lineUnlocked[SUMMER_ANT_LINE_ID] = true;
+    antUnlocked[SUMMER_ANT_LINE_ID] = 1;
+    homeUnlocked[SUMMER_ANT_LINE_ID] = 1;
+    antState[SUMMER_ANT_LINE_ID] = 1;
+    saveProgress();
+  }
+  updateAntSlotsVisibility();
+  updateSlotSpinCounters();
+}
+function saveProgress(){
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify(collectSaveData()));
+  } catch(e) { /* storage unavailable/full — fail silently, never break the game over a save */ }
+}
+function loadProgress(){
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw){ resetLiveStateToDefaults(); return; }
+    applySaveData(JSON.parse(raw));
+  } catch(e) { /* corrupt save — ignore it and start fresh rather than crash */ }
+}
+window.addEventListener("beforeunload", saveProgress);
+
+/* ---------------- MULTI-SLOT PROGRESS (Settings > Progress) ----------------
+   Up to MAX_SLOTS archived progress snapshots live in a separate localStorage key from the
+   live save. "New Progress" archives whatever's currently live into a slot, then resets the
+   live save to a blank one. Clicking an archived slot SWAPS it with the live save — nothing is
+   ever silently discarded, and the total slot count never changes on a swap, only on New/Delete. */
+const SLOTS_KEY = "battleAntsSlots_v1";
+const MAX_SLOTS = 4;
+function loadSlots(){
+  try {
+    const raw = localStorage.getItem(SLOTS_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch(e) { return []; }
+}
+function saveSlots(slots){
+  try { localStorage.setItem(SLOTS_KEY, JSON.stringify(slots)); } catch(e) { /* ignore */ }
+}
+// "How close to beating the game" — average of: best Endless Battle loop reached (capped at
+// loop 10), fraction of Battle Selection stages beaten, and fraction of ant lines leveled to
+// their max. Always measured against the CURRENT roster/round list, so it stays accurate even
+// after new ants or stages are added later.
+function computeProgressPercent(data){
+  if (!data) return 0;
+  const loopFrac = Math.min(data.bestLoopReached||0, 10) / 10;
+  const clearedCount = ROUNDS.filter(r => data.roundsCleared && data.roundsCleared[r.id]).length;
+  const roundsFrac = ROUNDS.length ? clearedCount/ROUNDS.length : 0;
+  const maxedCount = ANT_LINES.filter(l => data.maxLevelReached && data.maxLevelReached[l.id]).length;
+  const antsFrac = ANT_LINES.length ? maxedCount/ANT_LINES.length : 0;
+  return Math.round(((loopFrac+roundsFrac+antsFrac)/3) * 100);
+}
+
+function updateCoinHud(){ coinEl.textContent = "🪙 " + fmt(antCoins) + " Ant Coins"; saveProgress(); }
+function flashCoins(){ coinEl.classList.add("flash"); setTimeout(()=>coinEl.classList.remove("flash"), 260); }
+function updateCounts(){
+  let a=0,b=0; for(const e of entities){ if(e.dead || e.isBase) continue; e.team==="ant"?a++:b++; }
+  document.getElementById("antCount").textContent=a;
+  document.getElementById("bugCount").textContent=b;
+}
+function updateBaseHud(){
+  if (!baseEntityRef) return;
+  const frac = Math.max(0, baseEntityRef.hp/baseEntityRef.maxHp);
+  const fillEl = document.getElementById("baseBarFill");
+  fillEl.style.width = (frac*100).toFixed(1)+"%";
+  fillEl.style.background = frac>0.5 ? "#63c132" : frac>0.25 ? "#e6a532" : "#d43d3d";
+  document.getElementById("baseHpText").textContent = fmt(Math.max(0,Math.round(baseEntityRef.hp))) + " HP";
+}
+
+function livingAntCount(){
+  let n=0; for (const e of entities){ if (!e.dead && e.team==="ant" && !e.isBase) n++; } return n;
+}
+function makeEntity(team, def, stats, size, art, bounty, isBoss){
+  if (entities.filter(e=>!e.dead).length >= MAX_ENTITIES) return null;
+  if (team==="ant" && livingAntCount() >= MAX_ANTS) return null;
+  const g = document.createElementNS(SVGNS,"g");
+  const artG = document.createElementNS(SVGNS,"g");
+  const facingRight = team==="bug";
+  const scale = size;
+  artG.setAttribute("transform", `scale(${facingRight?-scale:scale},${scale})`);
+  artG.innerHTML = art;
+  // name tag
+  const label = document.createElementNS(SVGNS,"text");
+  label.setAttribute("text-anchor","middle");
+  label.setAttribute("y", -18*size-6);
+  label.setAttribute("font-size","8.5");
+  label.setAttribute("font-family","var(--font-mono)");
+  label.setAttribute("fill", team==="ant" ? "#ffc558" : "#c3ec6a");
+  label.textContent = stats.n;
+  // hp bar
+  const barW = 30;
+  const barBg = document.createElementNS(SVGNS,"rect");
+  barBg.setAttribute("x",-barW/2); barBg.setAttribute("y",-18*size-3);
+  barBg.setAttribute("width",barW); barBg.setAttribute("height",3.4); barBg.setAttribute("rx",1.6);
+  barBg.setAttribute("fill","#000"); barBg.setAttribute("opacity","0.5");
+  const barFill = document.createElementNS(SVGNS,"rect");
+  barFill.setAttribute("x",-barW/2); barFill.setAttribute("y",-18*size-3);
+  barFill.setAttribute("width",barW); barFill.setAttribute("height",3.4); barFill.setAttribute("rx",1.6);
+  barFill.setAttribute("fill","#63c132");
+  g.appendChild(artG); g.appendChild(barBg); g.appendChild(barFill); g.appendChild(label);
+  svg.appendChild(g);
+
+  const e = {
+    team, x:0, y:0, hp:stats.hp, maxHp:stats.hp, dmg:stats.dmg,
+    speed:def.speed*(0.9+Math.random()*0.2), size, dir: team==="ant"?-1:1,
+    el:g, artG, barFill, barW, dead:false, lastAttack:0, bounty:bounty||0, hitT:0, isBoss:!!isBoss
+  };
+  e.x = team==="ant" ? FIELD_W-34 : 34;
+  e.y = 30 + Math.random()*(FIELD_H-60);
+  g.setAttribute("transform",`translate(${e.x},${e.y})`);
+  entities.push(e);
+  updateCounts();
+  return e;
+}
+
+function applyStageFeat(spawned, stage){
+  if (!spawned || !stage.feat) return;
+  const f = stage.feat;
+  if (f.stationary) spawned.stationary = true;
+  if (f.moveToMiddle) spawned.moveToMiddle = true;
+  if (f.rangedLightning) spawned.rangedLightning = true;
+  if (f.ranged){ spawned.ranged = true; spawned.rangedColor = f.glow || "#f5a623"; }
+  if (f.aoe) spawned.aoe = true;
+  if (f.killLimit !== undefined){ spawned.killLimit = f.killLimit; spawned.killCount = 0; }
+  if (f.charmOnHit) spawned.charmOnHit = true;
+  if (f.summonAny) spawned.summonAny = true;
+  if (f.summonBug) spawned.summonBug = true;
+  if (f.summonCap !== undefined) spawned.summonCapAnt = f.summonCap;
+  if (f.summonBugCap !== undefined) spawned.summonCapBug = f.summonBugCap;
+}
+
+/* ---------------- CONTINUOUS ANT LEVELING (Lv.1 up to stages.length*10) ----------------
+   Every ant line can be leveled up to (number of named forms * 10) — e.g. a normal 3-form
+   line maxes at Lv.30, Zombie's 9-form line maxes at Lv.90. Each level costs XP, 1.1x more
+   than the level before it (compounding, seeded from the line's own costs[0]). Each level
+   makes hp/dmg 1.1x stronger than the level before (compounding off stage 0's base stats).
+   Every 10 levels the ant switches to the line's next named form/art — the last named form
+   is reached exactly at max level. HP/DMG are clamped to the same 1e300 / 1e250 ceiling
+   already used elsewhere in the game so extreme lines (like End killer) can't overflow to
+   Infinity and break HP-bar math. */
+const LEVEL_HP_CAP = 1e300, LEVEL_DMG_CAP = 1e250;
+function maxLevelFor(line){ return line.stages.length * 10; }
+function formIndexAtLevel(line, level){ return Math.min(line.stages.length-1, Math.floor((level-1)/10)); }
+function formAtLevel(line, level){ return line.stages[formIndexAtLevel(line, level)]; }
+// Every line grows 1.1x per level by default — a line can override that curve with its own
+// growthMult (e.g. the gift-only Summer Ant grows 1.5x per level instead).
+function hpAtLevel(line, level){ return Math.min(line.stages[0].hp * Math.pow(line.growthMult||1.1, level-1), LEVEL_HP_CAP); }
+function dmgAtLevel(line, level){ return Math.min(line.stages[0].dmg * Math.pow(line.growthMult||1.1, level-1), LEVEL_DMG_CAP); }
+function xpCostForLevel(line, level){ return Math.round((line.costs[0]||1) * Math.pow(1.1, level-1)); }
+// Ant Coin price to level up outside of a battle, at the Home Base — same numeric curve as the
+// XP cost, just paid in the scarcer currency (a deliberate premium for leveling without playing).
+function coinCostForLevel(line, level){ return xpCostForLevel(line, level); }
+
+// Shared level-up logic: applies a level gained through any path (in-battle XP or Home Base Ant
+// Coins) — bumps the permanent level, keeps the Lv.20/max-level milestones in sync, and saves.
+function grantLevelUp(line){
+  antUnlocked[line.id] = (antUnlocked[line.id]||1) + 1;
+  antState[line.id] = antUnlocked[line.id];
+  homeUnlocked[line.id] = antUnlocked[line.id];
+  const maxLvl = maxLevelFor(line);
+  if (antUnlocked[line.id] >= 20 && !levelMilestone[line.id]) levelMilestone[line.id] = true;
+  if (antUnlocked[line.id] >= maxLvl && !maxLevelReached[line.id]) maxLevelReached[line.id] = true;
+  saveProgress();
+}
+
+// Every line (other than the free base "ant") only becomes unlockable at the Home Base once
+// the line before it in the roster has been leveled to 20+ at least once — a permanent
+// milestone that stacks on top of the line's existing Ant Coin unlock cost. The Queen ant
+// evolution line ("summoner") is the exception: it requires EVERY other line to have hit
+// that milestone, not just the one right before it.
+// These 15 lines are gacha-only: they can no longer be bought with Ant Coins at the Home Base —
+// the only way to unlock (or, once unlocked, get a bonus level on) them is winning them from the
+// Rare Ant Slots. Every other line (the base Ant plus worker/soldier/tall/fast/butterfly/fish/
+// fire/titan) keeps its normal Ant Coin purchase path, and is also spinnable from the regular
+// Ant Slots. The Lv.20 sequential prereq chain (GATE_CHAIN/linePrereq) still governs eligibility
+// either way — a rare line only becomes winnable once its prereq is met.
+const RARE_SLOT_LINE_IDS = ["zombie","summoner","stoner","pokey","endkiller","kungfu","mrant",
+  "domant","antsinfood","ninja","zombified","samurai","sumo","boogie","moneko"];
+const GATE_CHAIN = ANT_LINES.filter(l=>l.id!=="ant" && l.id!=="summoner" && !l.giftOnly).map(l=>l.id);
+function linePrereq(lineId){
+  if (lineId === "ant") return null;
+  if (lineId === "summoner"){
+    // Gift-only lines (like Summer Ant) are excluded — they're not guaranteed to ever be
+    // obtained, so the Queen line can't be gated behind them.
+    const others = ANT_LINES.filter(l=>l.id!=="summoner" && !l.giftOnly);
+    const met = others.every(l=>levelMilestone[l.id]);
+    return { met, text: met ? "Every other line reached Lv.20" : "Requires every other line to reach Lv.20 first" };
+  }
+  const idx = GATE_CHAIN.indexOf(lineId);
+  if (idx === -1) return null;
+  const prevId = idx === 0 ? "ant" : GATE_CHAIN[idx-1];
+  const prevLine = ANT_LINES.find(l=>l.id===prevId);
+  const met = !!levelMilestone[prevId];
+  return { met, text: met ? `${prevLine.stages[0].n} reached Lv.20` : `Reach Lv.20 on ${prevLine.stages[0].n} first` };
+}
+
+function spawnAnt(line){
+  if (!runActive) return;
+  if (money < line.cost){ flashMoney(); return; }
+  if (livingAntCount() >= MAX_ANTS) return; // at the 100-ant cap — wait for room
+  money -= line.cost; updateMoney();
+  const level = antState[line.id] || 1;
+  const form = formAtLevel(line, level);
+  const formIdx = formIndexAtLevel(line, level);
+  const hp = Math.round(hpAtLevel(line, level));
+  const dmg = Math.round(dmgAtLevel(line, level));
+  const size = line.base * (0.82 + formIdx*0.06 + (line.zombie? formIdx*0.02:0)) * 0.68 * (form.sizeMod || 1);
+  const spawned = makeEntity("ant", line, {n:form.n, hp, dmg}, Math.min(size,1.35), antArt(form, line), 0);
+  applyStageFeat(spawned, form);
+}
+function spawnBug(b, mult){
+  if (!runActive) return;
+  const m = (mult || 1) * bugDifficultyMult() * stageTierMult() * roundTierMult();
+  const hp = Math.round(b.hp*m), dmg = Math.round(b.dmg*m);
+  const spawned = makeEntity("bug", b, {n:b.n,hp:hp,dmg:dmg}, b.base, bugArt(b), b.bounty, !!b.boss);
+  if (spawned && b.summonBugAlly){
+    spawned.summonBugAlly = true;
+    spawned.summonCapBugAlly = b.summonCapBugAlly || 10;
+  }
+}
+// Places one Tick Bush at a random spot on the field, at its flat 10 hp (no difficulty/round
+// scaling — it's a fixed hazard, not a combat-scaled bug). Stationary, deals no damage, ants
+// never target it on their own (noAntTarget), and it periodically calls in a random tick.
+function spawnTickBush(){
+  // Called from startRound() before runActive flips true (same timing as spawnBase/spawnBugBase),
+  // so this deliberately doesn't gate on runActive.
+  const b = BUG_BY_ID["tickbush"];
+  if (!b) return;
+  const spawned = makeEntity("bug", b, {n:b.n, hp:b.hp, dmg:b.dmg}, b.base, bugArt(b), 0, false);
+  if (!spawned) return;
+  spawned.noAntTarget = true;
+  spawned.summonsTicks = true;
+  spawned.stationary = true;
+  spawned.speed = 0;
+  spawned.x = 50 + Math.random()*(FIELD_W-100);
+  spawned.y = 30 + Math.random()*(FIELD_H-60);
+  spawned.el.setAttribute("transform", `translate(${spawned.x.toFixed(1)},${spawned.y.toFixed(1)})`);
+  return spawned;
+}
+
+/* ---------------- BASE ---------------- */
+function baseArt(){
+  return `
+    <rect x="-14" y="-30" width="28" height="60" rx="4" fill="#2a2118" stroke="#f2f2f2" stroke-width="1.4"/>
+    <rect x="-10" y="-24" width="20" height="48" rx="3" fill="#161616" stroke="#f2f2f2" stroke-width="1"/>
+    <rect x="-26" y="-6" width="16" height="12" rx="2" fill="#8a8f99" stroke="#f2f2f2" stroke-width="1"/>
+    <circle cx="-6" cy="0" r="4" fill="#e0392b"/>
+    <circle cx="0" cy="-14" r="3" fill="#f5a623"/><circle cx="0" cy="14" r="3" fill="#f5a623"/>`;
+}
+function spawnBase(){
+  const g = document.createElementNS(SVGNS,"g");
+  const artG = document.createElementNS(SVGNS,"g");
+  artG.innerHTML = baseArt();
+  const barW = 60;
+  const barBg = document.createElementNS(SVGNS,"rect");
+  barBg.setAttribute("x",-barW/2); barBg.setAttribute("y",-46); barBg.setAttribute("width",barW); barBg.setAttribute("height",5); barBg.setAttribute("rx",2);
+  barBg.setAttribute("fill","#000"); barBg.setAttribute("opacity","0.55");
+  const barFill = document.createElementNS(SVGNS,"rect");
+  barFill.setAttribute("x",-barW/2); barFill.setAttribute("y",-46); barFill.setAttribute("width",barW); barFill.setAttribute("height",5); barFill.setAttribute("rx",2);
+  barFill.setAttribute("fill","#63c132");
+  const label = document.createElementNS(SVGNS,"text");
+  label.setAttribute("text-anchor","middle"); label.setAttribute("y",-52); label.setAttribute("font-size","9");
+  label.setAttribute("font-family","var(--font-mono)"); label.setAttribute("fill","#ffc558"); label.textContent="Base";
+  g.appendChild(artG); g.appendChild(barBg); g.appendChild(barFill); g.appendChild(label);
+  svg.appendChild(g);
+  const maxHp = baseHpFor(baseHpLevel);
+  const e = {
+    team:"ant", x:FIELD_W-14, y:FIELD_H/2, hp:maxHp, maxHp:maxHp, dmg:0,
+    speed:0, size:1, dir:-1, el:g, artG, barFill, barW, dead:false, lastAttack:0, bounty:0, hitT:0, isBase:true
+  };
+  g.setAttribute("transform", `translate(${e.x},${e.y})`);
+  entities.push(e);
+  baseEntityRef = e;
+  updateBaseHud();
+}
+function bugBaseArt(){
+  return `
+    <rect x="-14" y="-30" width="28" height="60" rx="4" fill="#241a14" stroke="#c3ec6a" stroke-width="1.4"/>
+    <rect x="-10" y="-24" width="20" height="48" rx="3" fill="#161616" stroke="#c3ec6a" stroke-width="1"/>
+    <rect x="10" y="-6" width="16" height="12" rx="2" fill="#8a8f99" stroke="#c3ec6a" stroke-width="1"/>
+    <circle cx="6" cy="0" r="4" fill="#63c132"/>
+    <circle cx="0" cy="-14" r="3" fill="#c3ec6a"/><circle cx="0" cy="14" r="3" fill="#c3ec6a"/>`;
+}
+function spawnBugBase(hp){
+  const g = document.createElementNS(SVGNS,"g");
+  const artG = document.createElementNS(SVGNS,"g");
+  artG.innerHTML = bugBaseArt();
+  const barW = 60;
+  const barBg = document.createElementNS(SVGNS,"rect");
+  barBg.setAttribute("x",-barW/2); barBg.setAttribute("y",-46); barBg.setAttribute("width",barW); barBg.setAttribute("height",5); barBg.setAttribute("rx",2);
+  barBg.setAttribute("fill","#000"); barBg.setAttribute("opacity","0.55");
+  const barFill = document.createElementNS(SVGNS,"rect");
+  barFill.setAttribute("x",-barW/2); barFill.setAttribute("y",-46); barFill.setAttribute("width",barW); barFill.setAttribute("height",5); barFill.setAttribute("rx",2);
+  barFill.setAttribute("fill","#c3ec6a");
+  const label = document.createElementNS(SVGNS,"text");
+  label.setAttribute("text-anchor","middle"); label.setAttribute("y",-52); label.setAttribute("font-size","9");
+  label.setAttribute("font-family","var(--font-mono)"); label.setAttribute("fill","#c3ec6a"); label.textContent="Bug Base";
+  g.appendChild(artG); g.appendChild(barBg); g.appendChild(barFill); g.appendChild(label);
+  svg.appendChild(g);
+  const maxHp = hp || 5000;
+  const e = {
+    team:"bug", x:14, y:FIELD_H/2, hp:maxHp, maxHp:maxHp, dmg:0,
+    speed:0, size:1, dir:1, el:g, artG, barFill, barW, dead:false, lastAttack:0, bounty:0, hitT:0, isBugBase:true
+  };
+  g.setAttribute("transform", `translate(${e.x},${e.y})`);
+  entities.push(e);
+  return e;
+}
+
+/* ---------------- CANNON ---------------- */
+function fireCannon(){
+  if (!runActive || !cannonReady || !baseEntityRef) return;
+  cannonReady = false;
+  const targets = entities.filter(e=>!e.dead && e.team==="bug" && !e.isBugBase)
+    .sort((a,b)=>Math.hypot(a.x-baseEntityRef.x,a.y-baseEntityRef.y)-Math.hypot(b.x-baseEntityRef.x,b.y-baseEntityRef.y))
+    .slice(0, CANNON_TARGETS);
+  const cannonDmg = cannonDmgFor(cannonDmgLevel);
+  targets.forEach(t=>{ drawCannonBlast(baseEntityRef.x, baseEntityRef.y, t.x, t.y); damage(t, cannonDmg); });
+  let remain = cannonCooldownFor(cannonRechargeLevel);
+  const btn = document.getElementById("cannonBtn");
+  btn.disabled = true; btn.textContent = `🔫 Reloading… ${remain}s`;
+  clearInterval(cannonIntervalId);
+  cannonIntervalId = setInterval(()=>{
+    if (paused) return;
+    remain -= gameSpeed;
+    if (remain<=0){ clearInterval(cannonIntervalId); cannonReady=true; btn.disabled=!runActive; btn.textContent="🔫 Fire Cannon"; }
+    else btn.textContent = `🔫 Reloading… ${Math.ceil(remain)}s`;
+  }, 1000);
+}
+function drawCannonBlast(x1,y1,x2,y2){
+  const line = document.createElementNS(SVGNS,"line");
+  line.setAttribute("x1",x1); line.setAttribute("y1",y1); line.setAttribute("x2",x2); line.setAttribute("y2",y2);
+  line.setAttribute("stroke","#ffd76a"); line.setAttribute("stroke-width","2.4"); line.setAttribute("opacity","0.9");
+  svg.appendChild(line);
+  setTimeout(()=>{ line.style.transition="opacity .3s"; line.style.opacity="0"; setTimeout(()=>line.remove(),320); }, 90);
+}
+
+/* ---------------- COMBAT LOOP ---------------- */
+function damage(t, amt){
+  t.hp -= amt; t.hitT = gameClock;
+  const frac = Math.max(0, t.hp/t.maxHp);
+  t.barFill.setAttribute("width", (t.barW*frac).toFixed(1));
+  t.barFill.setAttribute("fill", frac>0.5 ? "#63c132" : frac>0.25 ? "#e6a532" : "#d43d3d");
+  if (t.isBase) updateBaseHud();
+  let killedNow = false;
+  if (t.hp <= 0 && !t.dead){
+    t.dead = true;
+    killedNow = true;
+    if (t.team==="bug"){
+      if (t.bounty){ addMoney(t.bounty); floatText(t.x,t.y,"+"+fmt(t.bounty)+"¢"); }
+      if (t.isBoss){
+        const coins = waveState.stage*50;
+        antCoins += coins; updateCoinHud();
+        floatText(t.x, t.y-14, "+"+fmt(coins)+" 🪙");
+      }
+      // Battle Selection rounds have no wave-clear XP of their own, so kills earn XP directly
+      // there instead — 100 XP per 5 kills. Endless Battle already has its own XP source
+      // (awardWaveXP), so this only applies while a round is active.
+      if (currentRoundId && !t.isBugBase){
+        roundKillCount++;
+        if (roundKillCount % 5 === 0){
+          xp += 100; updateXP();
+          floatText(t.x, t.y-28, "+100 XP");
+        }
+      } else if (!currentRoundId && !t.isBugBase){
+        // Endless Battle only: kills bank slot spins on two independent cadences — every 100
+        // kills banks 2 regular Ant Slot spins, and every 500 kills separately banks 1 Rare Ant
+        // Slot spin (both fire on a kill count that's a multiple of both, e.g. every 500th kill).
+        endlessKillCount++;
+        let gained = "";
+        if (endlessKillCount % 100 === 0){ antSlotSpins += 2; gained += "+2 🎰 "; }
+        if (endlessKillCount % 500 === 0){ rareAntSlotSpins += 1; gained += "+1 🎰✨"; }
+        if (gained){
+          updateSlotSpinCounters();
+          saveProgress();
+          floatText(t.x, t.y-28, gained.trim());
+        }
+      }
+    }
+    t.el.style.transition = "opacity .3s"; t.el.style.opacity = "0";
+    setTimeout(()=>{ t.el.remove(); }, 320);
+    setTimeout(updateCounts, 20);
+    if (t.isBase) loseRun();
+    if (t.isBugBase) winRound();
+  }
+  return killedNow;
+}
+
+function floatText(x,y,txt){
+  const t = document.createElementNS(SVGNS,"text");
+  t.setAttribute("x",x); t.setAttribute("y",y-24); t.setAttribute("text-anchor","middle");
+  t.setAttribute("font-size","13"); t.setAttribute("font-family","var(--font-mono)");
+  t.setAttribute("font-weight","700"); t.setAttribute("fill","#ffd76a");
+  t.textContent = txt; svg.appendChild(t);
+  let ty=y-24, op=1;
+  const iv=setInterval(()=>{ ty-=1.4; op-=0.04; t.setAttribute("y",ty); t.setAttribute("opacity",op);
+    if(op<=0){ clearInterval(iv); t.remove(); } }, 24);
+}
+
+let last = performance.now();
+function tick(now){
+  const rawDt = Math.min(now-last, 60)/1000; last = now;
+  if (paused){ requestAnimationFrame(tick); return; }
+  const dt = rawDt * gameSpeed; // gameplay clock, scaled by the speed toggle
+  gameClock += dt*1000;
+
+  if (runActive){
+    incomeAccumMs += dt*1000;
+    const lvl = INCOME_LEVELS[incomeLevel];
+    while (incomeAccumMs >= lvl.ms){
+      incomeAccumMs -= lvl.ms;
+      addMoney(lvl.amt);
+    }
+  }
+
+  for (const e of entities){
+    if (e.dead) continue;
+    if (!e.isBase && !e.isBugBase){
+      if (e.moveToMiddle && !e.reachedMiddle){
+        const midX = FIELD_W/2, mdx = midX - e.x;
+        if (Math.abs(mdx) > 4){
+          e.x += Math.sign(mdx) * MOVE_TO_MID_SPEED * dt;
+        } else {
+          e.x = midX; e.reachedMiddle = true; e.stationary = true;
+        }
+      } else {
+        let target=null, best=Infinity;
+        for (const o of entities){
+          if (o.dead || o.team===e.team) continue;
+          if (e.team==="ant" && o.noAntTarget) continue; // e.g. Tick Bush — ants never seek it out on their own
+          const d = Math.hypot(o.x-e.x, o.y-e.y);
+          if (d<best){ best=d; target=o; }
+        }
+        if (target){
+          const dx=target.x-e.x, dy=target.y-e.y, dist=Math.hypot(dx,dy)||1;
+          const atkRange = (e.rangedLightning || e.ranged) ? 9999 : (RANGE + e.size*6);
+          if (dist <= atkRange){
+            if (gameClock-e.lastAttack >= ATTACK_MS){
+              e.lastAttack = gameClock;
+              if (e.team==="bug" && target.charmOnHit){
+                // the charmer (queen/necromancer) gets attacked first like normal, then — if it
+                // survives — the attacking bug is turned onto the ant team.
+                const killedTarget = damage(target, e.dmg);
+                if (!killedTarget) charmConvert(e);
+              } else if (e.aoe){
+                for (const o of entities){
+                  if (o.dead || o.team===e.team) continue;
+                  if (e.team==="ant" && o.noAntTarget) continue; // Tick Bush is left alone by ant splash too
+                  const od = Math.hypot(o.x-e.x, o.y-e.y);
+                  if (od <= atkRange) damage(o, e.dmg);
+                }
+                drawAoePulse(e.x, e.y, atkRange);
+              } else {
+                if (e.rangedLightning) drawLightning(e.x, e.y, target.x, target.y);
+                else if (e.ranged) drawShot(e.x, e.y, target.x, target.y, e.rangedColor);
+                if (e.dmg>0){
+                  const killedTarget = damage(target, e.dmg);
+                  if (killedTarget && e.killLimit !== undefined){
+                    e.killCount = (e.killCount||0) + 1;
+                    if (e.killCount >= e.killLimit && !e.dead){
+                      floatText(e.x, e.y-14, "💥 spent");
+                      damage(e, e.maxHp*2 + 1);
+                    }
+                  }
+                }
+              }
+            }
+          } else if (!e.stationary){
+            e.x += (dx/dist)*e.speed*dt;
+            e.y += (dy/dist)*e.speed*dt;
+          }
+        } else if (!e.stationary){
+          e.x += e.dir*e.speed*dt;
+          e.x = Math.max(20, Math.min(FIELD_W-20, e.x));
+        }
+      }
+      if (e.summonAny && gameClock-(e.lastSummon||0) >= 4000){ e.lastSummon=gameClock; summonRandomAnt(e); }
+      if (e.summonBug && gameClock-(e.lastSummonBug||0) >= 6000){ e.lastSummonBug=gameClock; summonRandomBug(e); }
+      if (e.summonBugAlly && gameClock-(e.lastSummonBugAlly||0) >= 4000){ e.lastSummonBugAlly=gameClock; summonRandomBugAlly(e); }
+      if (e.summonsTicks && gameClock-(e.lastTickSummon||0) >= TICK_BUSH_SUMMON_MS){ e.lastTickSummon=gameClock; summonRandomTick(e); }
+    }
+    // hit flash
+    const flashing = gameClock - e.hitT < 90;
+    e.artG.setAttribute("opacity", flashing ? "0.4" : "1");
+    e.el.setAttribute("transform", `translate(${e.x.toFixed(1)},${e.y.toFixed(1)})`);
+  }
+  // occasional cleanup of dead refs
+  if (entities.length > 260) entities = entities.filter(e=>!e.dead || e.el.parentNode);
+  requestAnimationFrame(tick);
+}
+
+/* ---------------- SUMMONER ABILITIES ---------------- */
+function drawLightning(x1,y1,x2,y2){
+  const midx=(x1+x2)/2 + (Math.random()*24-12), midy=(y1+y2)/2 + (Math.random()*24-12);
+  const path = document.createElementNS(SVGNS,"path");
+  path.setAttribute("d", `M${x1.toFixed(1)} ${y1.toFixed(1)} L${midx.toFixed(1)} ${midy.toFixed(1)} L${x2.toFixed(1)} ${y2.toFixed(1)}`);
+  path.setAttribute("stroke","#8fd0ff"); path.setAttribute("stroke-width","2.2"); path.setAttribute("fill","none"); path.setAttribute("opacity","0.9");
+  svg.appendChild(path);
+  setTimeout(()=>{ path.style.transition="opacity .25s"; path.style.opacity="0"; setTimeout(()=>path.remove(),260); }, 70);
+}
+function drawShot(x1,y1,x2,y2,color){
+  const line = document.createElementNS(SVGNS,"line");
+  line.setAttribute("x1",x1.toFixed(1)); line.setAttribute("y1",y1.toFixed(1));
+  line.setAttribute("x2",x2.toFixed(1)); line.setAttribute("y2",y2.toFixed(1));
+  line.setAttribute("stroke", color||"#f5a623"); line.setAttribute("stroke-width","2"); line.setAttribute("stroke-linecap","round"); line.setAttribute("opacity","0.85");
+  svg.appendChild(line);
+  setTimeout(()=>{ line.style.transition="opacity .2s"; line.style.opacity="0"; setTimeout(()=>line.remove(),220); }, 60);
+}
+function drawAoePulse(x,y,r){
+  const c = document.createElementNS(SVGNS,"circle");
+  c.setAttribute("cx",x.toFixed(1)); c.setAttribute("cy",y.toFixed(1));
+  c.setAttribute("r", r.toFixed(1)); c.setAttribute("fill","none");
+  c.setAttribute("stroke","#c9d878"); c.setAttribute("stroke-width","2.2"); c.setAttribute("opacity","0.8");
+  svg.appendChild(c);
+  setTimeout(()=>{ c.style.transition="opacity .3s"; c.style.opacity="0"; setTimeout(()=>c.remove(),320); }, 60);
+}
+function charmConvert(e){
+  if (e.team === "ant") return;
+  e.team = "ant"; e.dir = -1;
+  const label = e.el.querySelector("text");
+  if (label) label.setAttribute("fill","#ffc558");
+  const ring = document.createElementNS(SVGNS,"circle");
+  ring.setAttribute("r","15"); ring.setAttribute("fill","none");
+  ring.setAttribute("stroke","#c86fb0"); ring.setAttribute("stroke-width","1.6"); ring.setAttribute("opacity","0.85");
+  e.el.appendChild(ring);
+  setTimeout(()=>{ ring.style.transition="opacity .6s"; ring.style.opacity="0"; setTimeout(()=>ring.remove(),650); }, 250);
+  setTimeout(updateCounts, 20);
+}
+function placeNear(spawned, e){
+  if (!spawned) return;
+  const dir = e.dir || -1;
+  spawned.x = Math.max(20, Math.min(FIELD_W-20, e.x + dir*(16 + Math.random()*40)));
+  spawned.y = Math.min(FIELD_H-20, Math.max(20, e.y + (Math.random()*70-35)));
+  spawned.el.setAttribute("transform", `translate(${spawned.x.toFixed(1)},${spawned.y.toFixed(1)})`);
+}
+function summonRandomAnt(e){
+  if (e.summonCapAnt !== undefined){
+    if (!e.summonRefs) e.summonRefs = [];
+    e.summonRefs = e.summonRefs.filter(r=>!r.dead);
+    if (e.summonRefs.length >= e.summonCapAnt) return; // at cap — wait for a slot to free up (a summon dies)
+  }
+  const pool = ANT_LINES.filter(l=>l.id!=="summoner");
+  const line = pool[Math.floor(Math.random()*pool.length)];
+  const formIdx = Math.floor(Math.random()*line.stages.length);
+  const level = formIdx*10 + 1; // summon at the start of that randomly chosen form's level bracket
+  const form = line.stages[formIdx];
+  const hp = Math.round(hpAtLevel(line, level));
+  const dmg = Math.round(dmgAtLevel(line, level));
+  const size = Math.min(line.base*(0.82+formIdx*0.06+(line.zombie?formIdx*0.02:0))*0.68*(form.sizeMod||1), 1.35);
+  const spawned = makeEntity("ant", line, {n:form.n, hp, dmg}, size, antArt(form,line), 0);
+  if (spawned){
+    applyStageFeat(spawned, form);
+    if (e.summonCapAnt !== undefined) e.summonRefs.push(spawned);
+    placeNear(spawned, e);
+  }
+}
+function summonRandomBug(e){
+  if (e.summonCapBug !== undefined){
+    if (!e.summonBugRefs) e.summonBugRefs = [];
+    e.summonBugRefs = e.summonBugRefs.filter(r=>!r.dead);
+    if (e.summonBugRefs.length >= e.summonCapBug) return; // at cap — wait for a slot to free up
+  }
+  const pool = BUGS.filter(bug=>bug.id!=="theend" && bug.id!=="tickbush"); // the queen can never summon The End or a Tick Bush, tamed or otherwise
+  const b = pool[Math.floor(Math.random()*pool.length)];
+  const spawned = makeEntity("ant", b, {n:b.n+" (tamed)", hp:b.hp, dmg:b.dmg}, b.base, bugArt(b), 0, false);
+  if (spawned){
+    if (e.summonCapBug !== undefined) e.summonBugRefs.push(spawned);
+    placeNear(spawned, e);
+  }
+}
+function summonRandomBugAlly(e){
+  if (e.summonCapBugAlly !== undefined){
+    if (!e.summonBugAllyRefs) e.summonBugAllyRefs = [];
+    e.summonBugAllyRefs = e.summonBugAllyRefs.filter(r=>!r.dead);
+    if (e.summonBugAllyRefs.length >= e.summonCapBugAlly) return; // at cap — wait for a slot to free up
+  }
+  const pool = BUGS.filter(b=>!b.summonBugAlly && b.id!=="theend" && b.id!=="tickbush");
+  const b = pool[Math.floor(Math.random()*pool.length)];
+  const spawned = makeEntity("bug", b, {n:b.n, hp:b.hp, dmg:b.dmg}, b.base, bugArt(b), b.bounty, !!b.boss);
+  if (spawned){
+    if (e.summonCapBugAlly !== undefined) e.summonBugAllyRefs.push(spawned);
+    placeNear(spawned, e);
+  }
+}
+// A Tick Bush periodically calls in one random tick as reinforcement — scaled by the same
+// difficulty/round multipliers a normal round spawn would use, placed right next to the bush.
+const TICK_BUSH_SUMMON_MS = 5000;
+function summonRandomTick(e){
+  const pool = BUGS.filter(b=>TICK_BUG_IDS.includes(b.id));
+  if (!pool.length) return;
+  const b = pool[Math.floor(Math.random()*pool.length)];
+  const m = bugDifficultyMult() * stageTierMult() * roundTierMult();
+  const hp = Math.round(b.hp*m), dmg = Math.round(b.dmg*m);
+  const spawned = makeEntity("bug", b, {n:b.n, hp, dmg}, b.base, bugArt(b), b.bounty, false);
+  if (spawned) placeNear(spawned, e);
+}
+
+/* ---------------- INCOME ---------------- */
+// Passive income accrues inside the main tick loop below so it respects the income
+// upgrade level (INCOME_LEVELS) and the game-speed toggle.
+
+/* ---------------- UI BUILD ---------------- */
+// Rapid-spawn: holding a card's art toggles that line into this set. While a line is in the
+// set, we keep trying to spawn it on an interval — spawns burn through money as fast as it
+// comes in, and picks back up automatically once you can afford another. Multiple lines can
+// be toggled on at once. Holding the same card again toggles it back off.
+const autoSpawnLines = new Set();
+setInterval(()=>{
+  if (!runActive || paused || autoSpawnLines.size===0) return;
+  autoSpawnLines.forEach(id=>{
+    const line = ANT_LINES.find(l=>l.id===id);
+    if (line && money>=line.cost) spawnAnt(line);
+  });
+}, 150);
+const HOLD_MS = 350;
+
+function buildAntCards(){
+  const wrap = document.getElementById("antCards");
+  ANT_LINES.forEach(line=>{
+    antState[line.id] = homeUnlocked[line.id] || 1;
+    antUnlocked[line.id] = homeUnlocked[line.id] || 1;
+    const card = document.createElement("div");
+    card.className = "card" + (line.zombie?" zombie":"");
+    antCardEls[line.id] = card;
+    const stage = line.stages[0];
+    card.innerHTML = `
+      <div class="cname" data-name>${stage.n}</div>
+      <div class="cart" data-art title="${line.id==="ant" ? "Click: spawn · Right-click: peek stats" : "Click: spawn · Hold: toggle rapid-spawn · Right-click: peek stats"}">
+        <svg viewBox="-26 -26 52 52" data-artsvg></svg>
+      </div>
+      <div class="cstats hidden" data-stats><span class="chp" data-hp></span><span class="cdmg" data-dmg></span></div>
+      <div class="cost" data-cost>${line.cost}¢</div>
+      <div class="stagepips" data-pips>${line.stages.map((_,i)=>`<span class="pip ${i===0?'on':''}"></span>`).join("")}</div>
+      <div class="nextcost" data-nextcost></div>
+      <div class="evo">
+        <button data-up>▲</button>
+        <button data-down disabled>▼</button>
+      </div>`;
+    wrap.appendChild(card);
+    const nameEl=card.querySelector("[data-name]"), hpEl=card.querySelector("[data-hp]"),
+          dmgEl=card.querySelector("[data-dmg]"), pipsEl=card.querySelector("[data-pips]"),
+          nextEl=card.querySelector("[data-nextcost]"),
+          upBtn=card.querySelector("[data-up]"), downBtn=card.querySelector("[data-down]"),
+          artEl=card.querySelector("[data-art]"), artSvgEl=card.querySelector("[data-artsvg]"),
+          statsEl=card.querySelector("[data-stats]");
+    const maxLvl = maxLevelFor(line);
+    function refresh(){
+      const sel=antState[line.id], unlocked=antUnlocked[line.id];
+      const form = formAtLevel(line, sel);
+      const hp = hpAtLevel(line, sel), dmg = dmgAtLevel(line, sel);
+      const curFormIdx = formIndexAtLevel(line, unlocked);
+      nameEl.textContent = `${form.n} · Lv.${sel}`;
+      hpEl.textContent = fmt(Math.round(hp))+" HP"; dmgEl.textContent = fmt(Math.round(dmg))+" DMG";
+      artSvgEl.innerHTML = antArt(form, line);
+      pipsEl.querySelectorAll(".pip").forEach((p,k)=>p.classList.toggle("on",k<=curFormIdx));
+      downBtn.disabled = sel<=1;
+      const atMax = unlocked>=maxLvl;
+      if (atMax){
+        upBtn.disabled = sel>=unlocked;
+        upBtn.title = "Max level";
+        nextEl.textContent = `Max level reached (Lv.${maxLvl})`;
+      } else if (sel<unlocked){
+        upBtn.disabled = false;
+        upBtn.title = "Switch to unlocked level";
+        nextEl.textContent = `Unlocked up to: Lv.${unlocked}`;
+      } else {
+        const cost = xpCostForLevel(line, unlocked);
+        const nextForm = formAtLevel(line, unlocked+1);
+        const becomesNewForm = formIndexAtLevel(line, unlocked+1) !== formIndexAtLevel(line, unlocked);
+        upBtn.disabled = xp<cost;
+        upBtn.title = `Level up to Lv.${unlocked+1} for ${fmt(cost)} XP`;
+        nextEl.textContent = becomesNewForm
+          ? `Next: Lv.${unlocked+1} — becomes ${nextForm.n} · ${fmt(cost)} XP`
+          : `Next: Lv.${unlocked+1} · ${fmt(cost)} XP`;
+      }
+    }
+    upBtn.onclick=()=>{
+      const sel=antState[line.id], unlocked=antUnlocked[line.id];
+      if (sel<unlocked){ antState[line.id]++; refresh(); return; }
+      if (unlocked>=maxLvl) return;
+      const cost = xpCostForLevel(line, unlocked);
+      if (xp<cost){ flashXP(); return; }
+      xp -= cost; updateXP();
+      grantLevelUp(line);
+      refresh();
+    };
+    downBtn.onclick=()=>{ if(antState[line.id]>1){ antState[line.id]--; refresh(); } };
+
+    // click the art = spawn once · hold it = toggle rapid auto-spawn on/off · right-click = peek stats
+    let pressTimer=null, held=false;
+    artEl.addEventListener("mousedown",(ev)=>{
+      if (ev.button!==0) return;
+      held=false;
+      clearTimeout(pressTimer);
+      if (line.id === "ant") return; // base Ant: holding does nothing — no rapid-spawn toggle
+      pressTimer=setTimeout(()=>{
+        held=true;
+        if (autoSpawnLines.has(line.id)) autoSpawnLines.delete(line.id); else autoSpawnLines.add(line.id);
+        artEl.classList.toggle("autospawning", autoSpawnLines.has(line.id));
+      }, HOLD_MS);
+    });
+    artEl.addEventListener("mouseup",(ev)=>{
+      if (ev.button!==0) return;
+      clearTimeout(pressTimer);
+      if (!held) spawnAnt(line);
+      held=false;
+    });
+    artEl.addEventListener("mouseleave",()=>{ clearTimeout(pressTimer); held=false; });
+    artEl.addEventListener("contextmenu",(ev)=>{
+      ev.preventDefault();
+      statsEl.classList.toggle("hidden");
+    });
+
+    antCardRefreshers[line.id] = refresh;
+    refresh();
+  });
+}
+function buildBugCards(){
+  const wrap = document.getElementById("bugCards");
+  BUGS.forEach(b=>{
+    const card = document.createElement("div");
+    card.className="card" + (b.boss ? " zombie" : "");
+    card.id = "bugcard-"+b.id;
+    card.title = "Right-click: peek stats";
+    card.innerHTML = `
+      <div class="cname">${b.n}</div>
+      <div class="cstats hidden" data-stats><span class="chp">${fmt(b.hp)} HP</span><span class="cdmg">${fmt(b.dmg)} DMG</span></div>
+      <div class="cost free">${b.boss ? "WAVE BOSS" : "AUTO"} · +${fmt(b.bounty)}¢</div>
+      <div class="stagepips"><span class="pip"></span></div>`;
+    wrap.appendChild(card);
+    card.addEventListener("contextmenu",(ev)=>{
+      ev.preventDefault();
+      card.querySelector("[data-stats]").classList.toggle("hidden");
+    });
+  });
+}
+
+/* ---------------- WAVE SYSTEM ---------------- */
+const BUG_BY_ID = {}; BUGS.forEach(b=>BUG_BY_ID[b.id]=b);
+function rep(id,n){ return Array(n).fill(id); }
+function W(...pairs){ let out=[]; for(let i=0;i<pairs.length;i+=2) out.push(...rep(pairs[i],pairs[i+1])); return out; }
+
+// 10 stages x 3 waves. Wave 3 of each stage ends on its designated boss.
+const STAGE_PLAN = {
+  1:  [ W("termite",8), W("termite",5,"caterpillar",2), W("termite",5,"caterpillar",3,"termiteking",1) ],
+  2:  [ W("termite",10,"caterpillar",5), W("caterpillar",8,"worm",4), W("caterpillar",6,"termite",4,"kingcaterpillar",1) ],
+  3:  [ W("worm",8,"termite",6), W("worm",8,"spider",4), W("worm",6,"caterpillar",4,"wormking",1) ],
+  4:  [ W("spider",8,"cockroach",6), W("spider",8,"worm",6), W("spider",6,"cockroach",4,"blackwidow",1) ],
+  5:  [ W("cockroach",8,"spider",6), W("cockroach",8,"grasshopper",6), W("cockroach",6,"spider",4,"giantcockroach",1) ],
+  6:  [ W("grasshopper",8,"cockroach",6), W("grasshopper",8,"frog",6), W("grasshopper",6,"cockroach",4,"kinggrasshopper",1) ],
+  7:  [ W("frog",8,"grasshopper",6), W("frog",8,"lizard",6), W("frog",6,"grasshopper",4,"toad",1) ],
+  8:  [ W("lizard",8,"frog",6), W("lizard",8,"bird",6), W("lizard",6,"frog",4,"comododragon",1) ],
+  9:  [ W("bird",8,"lizard",6), W("bird",8,"anteater",1), W("bird",6,"lizard",4,"koribustard",1) ],
+  10: [ W("termiteking",4,"kingcaterpillar",3,"wormking",3), W("blackwidow",4,"giantcockroach",4,"kinggrasshopper",3), W("toad",2,"comododragon",2,"koribustard",1) ],
+  11: [ W("armadillo",10), W("armadillo",8,"bird",5), W("armadillo",6,"kingarmadillo",1,"vaccume",1) ],
+  12: [ W("aardvark",10), W("aardvark",8,"hugeaardvark",1), W("aardvark",6,"hugeaardvark",1,"bugman",1) ],
+};
+const TOTAL_STAGES = 12;
+function waveList(stage, wave){ return STAGE_PLAN[stage][wave-1]; }
+
+const waveState = { stage:1, wave:1, queue:[], spawnedCount:0, spawning:false };
+
+// ---- Battle Selection rounds: no stages/waves, just a random bug pool vs. a bug base ----
+let texasSpawnInterval = null; // holds the current round's spawn setTimeout id
+let roundKillCount = 0; // kills so far in the current Battle Selection round — every 5 = +100 XP
+let endlessKillCount = 0; // kills so far in the current Endless Battle run — every 100 = slot spins
+let antSlotSpins = 0; // banked spins for the Ant Slots page (persists across runs, like Ant Coins)
+let rareAntSlotSpins = 0; // banked spins for the Rare Ant Slots page (persists across runs)
+// Ants won from either slot machine no longer unlock/level up immediately — they land here
+// instead, as { id, lineId, wonVia:"normal"|"rare", wonAt } entries, until the player opens
+// Storage and chooses to Sell (for Ant Coins) or Use (apply the unlock/level-up) each one.
+let antStorage = [];
+function makeStorageId(){ return "s" + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+
+// Clearing all TOTAL_STAGES loops the simulation back to Stage 1 instead of ending the run —
+// each loop makes every bug 1.5x tougher than the loop before (compounding).
+let ngPlusLoop = 0;
+function bugDifficultyMult(){ return Math.pow(1.5, ngPlusLoop); }
+
+// Endless Battle's stage count counted cumulatively across loops (loop 2's Stage 1 is global
+// stage 13, and so on) rather than resetting to 1 every loop — stages 1-3 (only ever the very
+// first loop's, since the count keeps climbing after that) are an easier on-ramp at 0.5x (half
+// hp/dmg); past global stage 5, every bug's hp/dmg is 5x its original BUGS-roster value; past
+// global stage 20, it's 10x instead. None of these tiers stack with each other — it's a flat
+// multiplier off the original stat, per the tier you're in. Only applies to Endless Battle's
+// stage system, not the standalone Battle Selection rounds.
+function globalStageNumber(){ return ngPlusLoop * TOTAL_STAGES + waveState.stage; }
+function stageTierMult(){
+  if (currentRoundId) return 1; // Battle Selection rounds have no stage progression
+  const g = globalStageNumber();
+  if (g > 20) return 10;
+  if (g > 5) return 5;
+  if (g <= 3) return 0.5;
+  return 1;
+}
+
+// Battle Selection rounds get their own difficulty ramp, keyed off round order rather than
+// stages/loops — unlike the Endless Battle tiers above, these three DO stack (compounding), so
+// Montana onward is 2x, Virginia onward is 4x (2×2), and Washington onward is 8x (2×2×2) off
+// each bug's original roster hp/dmg. Only applies while inside a round (stageTierMult already
+// covers Endless Battle, and the two never apply at the same time).
+const ROUND_TIER_THRESHOLDS = ["montana","virginia","washington"];
+// These 5 early rounds are flat 2x weaker (half hp/dmg) instead of following the stacking
+// threshold ramp below — a one-off easing, not part of the Montana/Virginia/Washington chain.
+const ROUND_WEAKENED_IDS = ["texas","maine","california","ohio","alaska"];
+function roundTierMult(){
+  if (!currentRoundId) return 1;
+  const idx = ROUNDS.findIndex(r=>r.id===currentRoundId);
+  if (idx === -1) return 1;
+  let mult = 1;
+  ROUND_TIER_THRESHOLDS.forEach(tid=>{
+    const tIdx = ROUNDS.findIndex(r=>r.id===tid);
+    if (tIdx !== -1 && idx >= tIdx) mult *= 2;
+  });
+  if (ROUND_WEAKENED_IDS.includes(currentRoundId)) mult *= 0.5;
+  return mult;
+}
+
+function updateWaveHud(){
+  const loopTag = ngPlusLoop>0 ? ` · Loop ${ngPlusLoop+1} (${bugDifficultyMult().toFixed(2)}x)` : "";
+  document.getElementById("waveHud").textContent = `Stage ${waveState.stage}/${TOTAL_STAGES} · Wave ${waveState.wave}/3${loopTag}`;
+}
+function showBanner(text, cls){
+  bannerEl.textContent = text;
+  bannerEl.className = "banner show " + cls;
+  setTimeout(()=>{ bannerEl.classList.remove("show"); }, 1500);
+}
+function spawnWaveList(list){
+  waveState.queue = list.slice();
+  waveState.spawnedCount = 0;
+  waveState.spawning = true;
+  waveState.reinforced = 0;
+  waveState.startTime = performance.now();
+  waveState.endSpawned = false;
+  waveState.pausedMs = 0;
+  const bossWave = list.some(id => BUG_BY_ID[id] && BUG_BY_ID[id].boss);
+  const mult = bossWave ? 1.5 : 1;
+  waveState.bossMult = mult;
+  const spawnNext = ()=>{
+    if (!runActive){ waveState.spawning=false; return; }
+    if (paused){ setTimeout(spawnNext, 200); return; }
+    if (waveState.spawnedCount >= waveState.queue.length){ waveState.spawning=false; return; }
+    const def = BUG_BY_ID[waveState.queue[waveState.spawnedCount]];
+    if (def) spawnBug(def, mult);
+    waveState.spawnedCount++;
+    setTimeout(spawnNext, (260 + Math.random()*380)/gameSpeed);
+  };
+  spawnNext();
+}
+function startWave(stage, wave){
+  waveState.stage = stage; waveState.wave = wave;
+  updateWaveHud();
+  const def = BUG_BY_ID[waveList(stage, wave).slice(-1)[0]];
+  const bossTag = (def && def.boss) ? ` · ${def.n.toUpperCase()}` : "";
+  showBanner(`STAGE ${stage} · WAVE ${wave}${bossTag}`, "bug");
+  spawnWaveList(waveList(stage, wave));
+}
+function awardWaveXP(stage, wave){
+  const base = stage*100;
+  const reward = wave===3 ? base*2 : base;
+  xp += reward; updateXP();
+  Object.values(antCardRefreshers).forEach(fn=>fn());
+  floatText(FIELD_W/2, 26, `+${fmt(reward)} XP`);
+}
+function advanceWave(){
+  let {stage, wave} = waveState;
+  if (wave < 3){ wave++; setTimeout(()=>startWave(stage, wave), 1400/gameSpeed); return; }
+  if (stage < TOTAL_STAGES){ stage++; wave = 1; setTimeout(()=>startWave(stage, wave), 1400/gameSpeed); return; }
+  // Final stage cleared — full victory
+  setTimeout(()=>winRun(), 1400/gameSpeed);
+}
+// Reinforcements: a big ant army draws more bugs instead of just steamrolling a fixed wave
+// list — every ~8 living ants beyond a baseline of 10 calls in one more enemy from this wave's
+// own roster, so the fight scales with your army rather than the round just ending.
+function reinforceWave(){
+  if (!runActive || waveState.queue.length===0) return;
+  const antCount = livingAntCount();
+  if (antCount < 10) return;
+  const target = Math.floor(antCount/8);
+  if (target <= (waveState.reinforced||0)) return;
+  const pool = waveList(waveState.stage, waveState.wave);
+  const id = pool[Math.floor(Math.random()*pool.length)];
+  const def = BUG_BY_ID[id];
+  if (def) spawnBug(def, waveState.bossMult||1);
+  waveState.reinforced = (waveState.reinforced||0) + 1;
+}
+// If a single wave drags on past 5 real minutes, "The End" shows up — a near-unkillable
+// doom boss that punishes stalling instead of letting the wave sit uncleared forever.
+const WAVE_TIMEOUT_MS = 5*60*1000;
+function checkEndTimer(){
+  if (!runActive || waveState.queue.length===0 || waveState.endSpawned) return;
+  const elapsed = performance.now() - (waveState.startTime || performance.now()) - (waveState.pausedMs||0);
+  if (elapsed >= WAVE_TIMEOUT_MS){
+    waveState.endSpawned = true;
+    const def = BUG_BY_ID["theend"];
+    if (def) spawnBug(def, 1);
+    floatText(FIELD_W/2, 40, "THE END ARRIVES");
+  }
+}
+// poll for reinforcements, the wave-timeout boss, then for a fully-cleared wave
+setInterval(()=>{
+  if (!runActive || paused) return;
+  reinforceWave();
+  checkEndTimer();
+  if (waveState.spawning || waveState.queue.length===0) return;
+  const bugsAlive = entities.some(e=>!e.dead && e.team==="bug");
+  if (!bugsAlive){
+    awardWaveXP(waveState.stage, waveState.wave);
+    waveState.queue = [];
+    advanceWave();
+  }
+}, 500);
+
+document.getElementById("cannonBtn").onclick = fireCannon;
+document.getElementById("speedBtn").onclick = ()=>{
+  gameSpeed = gameSpeed===1 ? 2 : 1;
+  const btn = document.getElementById("speedBtn");
+  btn.textContent = gameSpeed===2 ? "▶ Normal Speed" : "⏩ 2x Speed";
+  btn.classList.toggle("active", gameSpeed===2);
+};
+
+const pauseOverlay = document.getElementById("pauseOverlay");
+document.getElementById("pauseBtn").onclick = ()=>{
+  if (!runActive || paused) return;
+  setPaused(true);
+  pauseOverlay.classList.add("show");
+};
+document.getElementById("resumeBtn").onclick = ()=>{
+  setPaused(false);
+  pauseOverlay.classList.remove("show");
+};
+document.getElementById("quitBtn").onclick = ()=>{
+  setPaused(false);
+  pauseOverlay.classList.remove("show");
+  endRun(0, "Run quit — no Ant Coins earned.");
+};
+
+/* ---------------- HOME SCREEN / RUN LIFECYCLE ---------------- */
+function showScreen(id){
+  ["homePage","battlePrepPage","stageSelectionPage","battleSelectionPage","summerStageSelectionPage","settingsPage","progressPage","antSlotsPage","rareAntSlotsPage","storagePage","homeScreen","gameScreen"].forEach(sid=>{
+    document.getElementById(sid).style.display = (sid===id) ? "block" : "none";
+  });
+}
+function showHomePage(){ updateHomePageEvent(); updateSummerGiftBanner(); showScreen("homePage"); }
+// ---- Seasonal events: swap the Home Page's look during a date window, checked against the
+// player's real device date every time the Home Page is shown. Recurs every year automatically
+// (month/day only — no specific year), so this doesn't need to be touched again next summer.
+// More events can be added the same way later: give them their own id/date range/CSS class and
+// their own HTML block gated behind that class, same pattern as "summer-event" below.
+const EVENTS = [
+  { id:"summer", name:"Summer Event", startMonth:6, startDay:1, endMonth:8, endDay:31, className:"summer-event", badgeId:"eventBadge", sceneId:"summerScene" },
+  { id:"tick", name:"Tick Season", startMonth:7, startDay:20, endMonth:8, endDay:10, className:"tick-event" },
+];
+// While Tick Season is active, every Battle Selection round's normal bug roster is swapped for
+// the tick family (spawning once a second, overriding that round's own spawnMs/spawnMsMin/Max),
+// and rounds from the 11th onward can additionally place Tick Bush hazards. See startRound().
+function isTickSeasonActive(){
+  const ev = EVENTS.find(e=>e.id==="tick");
+  return !!ev && isEventActive(ev);
+}
+function isEventActive(ev, now){
+  now = now || new Date();
+  const cur = (now.getMonth()+1)*100 + now.getDate();
+  const start = ev.startMonth*100 + ev.startDay;
+  const end = ev.endMonth*100 + ev.endDay;
+  return start <= end ? (cur >= start && cur <= end) : (cur >= start || cur <= end); // handles a range that wraps New Year's, unused today but future-proof
+}
+function activeEvents(){ return EVENTS.filter(ev=>isEventActive(ev)); }
+function updateHomePageEvent(){
+  const home = document.getElementById("homePage");
+  if (!home) return;
+  const active = activeEvents();
+  EVENTS.forEach(ev=>{
+    const on = active.includes(ev);
+    home.classList.toggle(ev.className, on);
+    const badge = document.getElementById(ev.badgeId);
+    if (badge) badge.classList.toggle("show", on);
+    const scene = document.getElementById(ev.sceneId);
+    if (scene) scene.classList.toggle("show", on);
+  });
+}
+
+/* ---------------- SUMMER EVENT: 92 DAYS OF LOGIN GIFTS ----------------
+   Day count is personal, not calendar-fixed — day 1 is whichever real day you first log in
+   during the Summer Event, not June 1st specifically. One gift grants per real calendar day the
+   game is opened while the event is active, up to SUMMER_GIFT_TOTAL_DAYS (92 — June+July+Aug).
+   Because a grant only ever happens while isEventActive() is true, a late start simply means
+   fewer total gifts get claimed before the event's real end date (Aug 31) cuts it off — there's
+   no catch-up/backfill once the season ends, and no way to reach day 92 by starting late.
+   Tracked in its own localStorage key (not the multi-slot save data) since it's a real-world
+   daily-login streak tied to the device, not to any particular saved progress. */
+const SUMMER_GIFT_TOTAL_DAYS = 92;
+const SUMMER_GIFT_KEY = "battleAntsSummerGift_v1";
+// Day 45 of the Summer Gift streak also unlocks the gift-only Summer Ant line, at Lv.1 — the
+// only way to ever get it, on top of that day's usual Ant Coin reward.
+const SUMMER_ANT_GIFT_DAY = 45;
+const SUMMER_ANT_LINE_ID = "summerant";
+function todayDateStr(d){ d = d || new Date(); return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); }
+function summerGiftReward(dayIndex){ return 100 + dayIndex*25; } // Ant Coins — day 1 = 125, day 92 = 2400
+function loadSummerGiftState(){
+  try {
+    const raw = localStorage.getItem(SUMMER_GIFT_KEY);
+    if (raw){
+      const p = JSON.parse(raw);
+      if (p && typeof p === "object") return { year:p.year||0, lastGrantDate:p.lastGrantDate||null, dayIndex:p.dayIndex||0 };
+    }
+  } catch(e){ /* ignore — fall through to a fresh state */ }
+  return { year:0, lastGrantDate:null, dayIndex:0 };
+}
+function saveSummerGiftState(){
+  try { localStorage.setItem(SUMMER_GIFT_KEY, JSON.stringify(summerGiftState)); } catch(e){ /* ignore */ }
+}
+let summerGiftState = loadSummerGiftState();
+// Call once per app load — grants at most one gift per real calendar day. Returns the grant just
+// made (or null if today's gift was already claimed, the event isn't active, or all 92 are used).
+function checkSummerGift(){
+  const summer = EVENTS.find(e=>e.id==="summer");
+  if (!summer || !isEventActive(summer)) return null;
+  const now = new Date();
+  const year = now.getFullYear();
+  const today = todayDateStr(now);
+  if (summerGiftState.year !== year) summerGiftState = { year, lastGrantDate:null, dayIndex:0 }; // fresh 92-day cycle each summer
+  if (summerGiftState.lastGrantDate === today) return null; // already claimed today
+  if (summerGiftState.dayIndex >= SUMMER_GIFT_TOTAL_DAYS) return null; // used up all 92 days
+  summerGiftState.dayIndex++;
+  summerGiftState.lastGrantDate = today;
+  saveSummerGiftState();
+  const reward = summerGiftReward(summerGiftState.dayIndex);
+  antCoins += reward;
+  updateCoinHud();
+  let summerAntGranted = false;
+  if (summerGiftState.dayIndex === SUMMER_ANT_GIFT_DAY && !lineUnlocked[SUMMER_ANT_LINE_ID]){
+    lineUnlocked[SUMMER_ANT_LINE_ID] = true;
+    antUnlocked[SUMMER_ANT_LINE_ID] = 1;
+    homeUnlocked[SUMMER_ANT_LINE_ID] = 1;
+    antState[SUMMER_ANT_LINE_ID] = 1;
+    summerAntGranted = true;
+    buildHomeShop(); // refresh so the newly-unlocked card shows up right away
+  }
+  saveProgress();
+  return { day: summerGiftState.dayIndex, reward, summerAntGranted };
+}
+function updateSummerGiftBanner(){
+  const el = document.getElementById("summerGiftBanner");
+  if (!el) return;
+  const summer = EVENTS.find(e=>e.id==="summer");
+  const active = summer && isEventActive(summer);
+  if (!active || summerGiftState.dayIndex === 0){
+    el.classList.remove("show");
+    return;
+  }
+  const antNote = summerGiftState.dayIndex === SUMMER_ANT_GIFT_DAY ? " · 🐜 Summer Ant unlocked!" : "";
+  el.textContent = `🎁 Summer Gift — Day ${summerGiftState.dayIndex}/${SUMMER_GIFT_TOTAL_DAYS} · +${fmt(summerGiftReward(summerGiftState.dayIndex))} 🪙 claimed today${antNote}`;
+  el.classList.add("show");
+}
+function showBattlePrep(){ updateEndlessLockUI(); showScreen("battlePrepPage"); }
+// Endless Battle stays locked until every Battle Selection round has been cleared — since this
+// checks the live ROUNDS array, adding a brand new round automatically re-locks Endless Battle
+// again until that new round is beaten too, with no extra bookkeeping needed.
+function allRoundsCleared(){ return ROUNDS.every(r=>roundsCleared[r.id]); }
+function updateEndlessLockUI(){
+  const btn = document.getElementById("endlessBtn");
+  const msg = document.getElementById("endlessLockMsg");
+  const unlocked = allRoundsCleared();
+  if (btn){
+    btn.disabled = !unlocked;
+    btn.title = unlocked ? "" : "Beat every Battle Selection round first";
+  }
+  if (msg){
+    const clearedCount = ROUNDS.filter(r=>roundsCleared[r.id]).length;
+    msg.textContent = unlocked ? "" : `🔒 Endless Battle unlocks after you beat all ${ROUNDS.length} Battle Selection rounds (${clearedCount}/${ROUNDS.length} cleared)`;
+  }
+}
+function showStageSelection(){ updateSummerStagesButtonState(); showScreen("stageSelectionPage"); }
+function showBattleSelection(){ buildBattleSelectButtons(); showScreen("battleSelectionPage"); }
+function showSettings(){ showScreen("settingsPage"); }
+function showProgress(){ buildProgressPage(); showScreen("progressPage"); }
+function showAntSlots(){ updateSlotSpinCounters(); showScreen("antSlotsPage"); }
+function showRareAntSlots(){ updateSlotSpinCounters(); showScreen("rareAntSlotsPage"); }
+function showStorage(){ buildStoragePage(); showScreen("storagePage"); }
+function showHome(){ showScreen("homeScreen"); }
+function showGame(){ showScreen("gameScreen"); }
+function updateAntSlotsVisibility(){
+  const row = document.getElementById("antSlotsRow");
+  if (!row) return;
+  row.classList.toggle("show", !!antSlotsUnlocked);
+}
+const SPIN10_THRESHOLD = 10;
+function updateSlotSpinCounters(){
+  const a = document.getElementById("antSlotsSpinCount");
+  const r = document.getElementById("rareAntSlotsSpinCount");
+  if (a) a.textContent = `Spins: ${antSlotSpins}`;
+  if (r) r.textContent = `Spins: ${rareAntSlotSpins}`;
+  const spinA = document.getElementById("spinAntSlotsBtn");
+  const spinR = document.getElementById("spinRareAntSlotsBtn");
+  if (spinA) spinA.disabled = antSlotSpins <= 0;
+  if (spinR) spinR.disabled = rareAntSlotSpins <= 0;
+  // "Spin 10×" only shows once you've banked 10+ of that spin type — it disappears the moment
+  // you drop back below 10, and reappears the moment you cross 10 again.
+  const spin10A = document.getElementById("spin10AntSlotsBtn");
+  const spin10R = document.getElementById("spin10RareAntSlotsBtn");
+  if (spin10A) spin10A.style.display = antSlotSpins >= SPIN10_THRESHOLD ? "" : "none";
+  if (spin10R) spin10R.style.display = rareAntSlotSpins >= SPIN10_THRESHOLD ? "" : "none";
+}
+
+// Regular Ant Slots pool: the base Ant plus every Ant-Coin-tier line (everything NOT gacha-only
+// and NOT gift-only — a gift-only line like Summer Ant can only ever come from its own event gift).
+const REGULAR_SLOT_LINE_IDS = ANT_LINES.filter(l=>!RARE_SLOT_LINE_IDS.includes(l.id) && !l.giftOnly).map(l=>l.id);
+
+// A line is a valid spin outcome once its normal Lv.20 prereq chain is satisfied — already-
+// unlocked lines are always eligible (a repeat result becomes a bonus level, uncapped, which can
+// push a maxed ant past its usual max level). This means a spin can never hand you something the
+// game wouldn't otherwise let you have yet.
+function eligibleSpinPool(lineIds){
+  return lineIds.filter(id=>{
+    if (lineUnlocked[id]) return true;
+    const prereq = linePrereq(id);
+    return !prereq || prereq.met;
+  });
+}
+
+// Rolls one spin's outcome against a pool and drops it straight into Storage — spinning no
+// longer unlocks or levels anything up on its own; the player has to go into Storage afterward
+// and choose to Use it (which applies the exact same unlock-at-Lv.1 / uncapped-level-up effect
+// spins used to apply immediately) or Sell it for Ant Coins instead.
+function rollToStorage(pool, wonVia){
+  const lineId = pool[Math.floor(Math.random()*pool.length)];
+  const entry = { id: makeStorageId(), lineId, wonVia, wonAt: Date.now() };
+  antStorage.push(entry);
+  return entry;
+}
+function spinAntSlots(){
+  if (antSlotSpins <= 0) return;
+  const pool = eligibleSpinPool(REGULAR_SLOT_LINE_IDS);
+  const resultEl = document.getElementById("antSlotsResult");
+  if (pool.length === 0){
+    if (resultEl) resultEl.textContent = "No ants are eligible yet — level up more lines first!";
+    return;
+  }
+  antSlotSpins--;
+  updateSlotSpinCounters();
+  const entry = rollToStorage(pool, "normal");
+  const line = ANT_LINES.find(l=>l.id===entry.lineId);
+  if (resultEl) resultEl.textContent = `🎁 ${line.stages[0].n} added to Storage!`;
+  const reelsEl = document.getElementById("antSlotsReels");
+  if (reelsEl) reelsEl.querySelectorAll(".reel").forEach(r=>{ r.textContent = "🎁"; });
+  saveProgress();
+}
+function spinRareAntSlots(){
+  // Rare Ant Slots has no other prerequisite — having a banked rare spin is the only thing
+  // needed, so every one of the 15 special lines is always a possible outcome (no Lv.20
+  // gating chain to satisfy first).
+  if (rareAntSlotSpins <= 0) return;
+  rareAntSlotSpins--;
+  updateSlotSpinCounters();
+  const entry = rollToStorage(RARE_SLOT_LINE_IDS, "rare");
+  const line = ANT_LINES.find(l=>l.id===entry.lineId);
+  const resultEl = document.getElementById("rareAntSlotsResult");
+  if (resultEl) resultEl.textContent = `🎁 ${line.stages[0].n} added to Storage!`;
+  const reelsEl = document.getElementById("rareAntSlotsReels");
+  if (reelsEl) reelsEl.querySelectorAll(".reel").forEach(r=>{ r.textContent = "🎁"; });
+  saveProgress();
+}
+function spinAntSlotsX10(){
+  if (antSlotSpins < SPIN10_THRESHOLD) return;
+  let count = 0;
+  for (let i=0;i<10;i++){
+    const pool = eligibleSpinPool(REGULAR_SLOT_LINE_IDS);
+    if (pool.length === 0) break; // the base Ant is always eligible, so this shouldn't happen
+    antSlotSpins--;
+    rollToStorage(pool, "normal");
+    count++;
+  }
+  updateSlotSpinCounters();
+  saveProgress();
+  const resultEl = document.getElementById("antSlotsResult");
+  if (resultEl) resultEl.textContent = `🎁 Spun ${count}× — ${count} ant${count===1?"":"s"} added to Storage!`;
+  const reelsEl = document.getElementById("antSlotsReels");
+  if (reelsEl) reelsEl.querySelectorAll(".reel").forEach(r=>{ r.textContent = "🔟"; });
+}
+function spinRareAntSlotsX10(){
+  if (rareAntSlotSpins < SPIN10_THRESHOLD) return;
+  for (let i=0;i<10;i++){
+    rareAntSlotSpins--;
+    rollToStorage(RARE_SLOT_LINE_IDS, "rare");
+  }
+  updateSlotSpinCounters();
+  saveProgress();
+  const resultEl = document.getElementById("rareAntSlotsResult");
+  if (resultEl) resultEl.textContent = "🎁 Spun 10× — 10 ants added to Storage!";
+  const reelsEl = document.getElementById("rareAntSlotsReels");
+  if (reelsEl) reelsEl.querySelectorAll(".reel").forEach(r=>{ r.textContent = "🔟"; });
+}
+
+// ---- Storage: Sell each rolled ant for Ant Coins, or Use it to apply the unlock/level-up ----
+function sellValueFor(line){
+  return Math.max(25, Math.round((line.unlockCost || 100) * 0.25));
+}
+// A flat Lv.100 ceiling on what Storage's "Use" can do — separate from (and lower than) each
+// line's own natural max level. Once a line has reached Lv.100, any duplicate rolled for it can
+// no longer be Used (which would otherwise push it past 100) — it can only be Sold instead. This
+// applies uniformly to every line, not just the gacha-only ones.
+const STORAGE_USE_LEVEL_CAP = 100;
+function storageEntryCapped(line){
+  return !!lineUnlocked[line.id] && (homeUnlocked[line.id]||1) >= STORAGE_USE_LEVEL_CAP;
+}
+function buildStoragePage(){
+  const wrap = document.getElementById("storageList");
+  if (!wrap) return;
+  wrap.innerHTML = "";
+  if (antStorage.length === 0){
+    wrap.innerHTML = `<div class="nextcost">Nothing in storage yet — spin the Ant Slots or Rare Ant Slots to roll for ants!</div>`;
+    return;
+  }
+  antStorage.forEach(entry=>{
+    const line = ANT_LINES.find(l=>l.id===entry.lineId);
+    if (!line) return;
+    const willUnlock = !lineUnlocked[line.id];
+    const capped = storageEntryCapped(line);
+    const sellValue = sellValueFor(line);
+    const card = document.createElement("div");
+    card.className = "card" + (line.zombie?" zombie":"");
+    const useText = capped
+      ? `Already Lv.${STORAGE_USE_LEVEL_CAP} — can't be used, sell it instead`
+      : (willUnlock ? "Use → unlocks the line at Lv.1" : "Use → +1 level");
+    card.innerHTML = `
+      <div class="cname">${entry.wonVia==="rare" ? "🎰✨" : "🎰"} ${line.stages[0].n}</div>
+      <div class="nextcost">${useText}</div>
+      <div class="row">
+        <button class="spawn" ${capped?"disabled":""} data-use>⚡ Use</button>
+        <button class="equipbtn" data-sell>💰 Sell · ${fmt(sellValue)} 🪙</button>
+      </div>`;
+    wrap.appendChild(card);
+    if (!capped) card.querySelector("[data-use]").onclick = ()=>useStorageEntry(entry.id);
+    card.querySelector("[data-sell]").onclick = ()=>sellStorageEntry(entry.id);
+  });
+}
+function useStorageEntry(entryId){
+  const idx = antStorage.findIndex(e=>e.id===entryId);
+  if (idx === -1) return;
+  const entry = antStorage[idx];
+  const line = ANT_LINES.find(l=>l.id===entry.lineId);
+  if (!line) return;
+  if (storageEntryCapped(line)) return; // Lv.100+ lines can only be sold from Storage, not used
+  if (!lineUnlocked[line.id]){
+    lineUnlocked[line.id] = true;
+    homeUnlocked[line.id] = 1;
+    antUnlocked[line.id] = 1;
+    antState[line.id] = 1;
+  } else {
+    grantLevelUp(line);
+  }
+  antStorage.splice(idx, 1);
+  if (antCardRefreshers[line.id]) antCardRefreshers[line.id]();
+  saveProgress();
+  buildHomeShop();
+  buildStoragePage();
+}
+function sellStorageEntry(entryId){
+  const idx = antStorage.findIndex(e=>e.id===entryId);
+  if (idx === -1) return;
+  const entry = antStorage[idx];
+  const line = ANT_LINES.find(l=>l.id===entry.lineId);
+  if (!line) return;
+  antCoins += sellValueFor(line);
+  antStorage.splice(idx, 1);
+  updateCoinHud();
+  saveProgress();
+  buildStoragePage();
+}
+
+function buildBattleSelectButtons(){
+  const wrap = document.getElementById("battleSelectButtons");
+  wrap.innerHTML = "";
+  ROUNDS.forEach((round, idx)=>{
+    const locked = idx > 0 && !roundsCleared[ROUNDS[idx-1].id];
+    if (locked){
+      const sub = document.createElement("div");
+      sub.className = "roundSub";
+      sub.textContent = `🔒 Beat ${ROUNDS[idx-1].name} to unlock`;
+      wrap.appendChild(sub);
+    }
+    const btn = document.createElement("button");
+    btn.className = "startbtn";
+    btn.textContent = `${round.emoji} ${round.name}` + (roundsCleared[round.id] ? " ✓" : "");
+    btn.disabled = locked;
+    btn.onclick = ()=> startRound(round);
+    wrap.appendChild(btn);
+  });
+}
+
+// Summer Stages: same list-building pattern as the state rounds, unlocked purely by clearing the
+// previous Summer Stage (no dependency on the main ROUNDS chain).
+function buildSummerStageSelectButtons(){
+  const wrap = document.getElementById("summerStageSelectButtons");
+  wrap.innerHTML = "";
+  SUMMER_ROUNDS.forEach((round, idx)=>{
+    const locked = idx > 0 && !roundsCleared[SUMMER_ROUNDS[idx-1].id];
+    if (locked){
+      const sub = document.createElement("div");
+      sub.className = "roundSub";
+      sub.textContent = `🔒 Beat ${SUMMER_ROUNDS[idx-1].name} to unlock`;
+      wrap.appendChild(sub);
+    }
+    const btn = document.createElement("button");
+    btn.className = "startbtn";
+    btn.textContent = `${round.emoji} ${round.name}` + (roundsCleared[round.id] ? " ✓" : "");
+    btn.disabled = locked;
+    btn.onclick = ()=> startRound(round);
+    wrap.appendChild(btn);
+  });
+}
+function showSummerStageSelection(){ buildSummerStageSelectButtons(); showScreen("summerStageSelectionPage"); }
+// The Summer Stages button on the Stage Selection page only works while the Summer Event is
+// active — re-checked every time that page is shown, so it flips on/off with the real calendar.
+function updateSummerStagesButtonState(){
+  const btn = document.getElementById("summerStagesBtn");
+  if (!btn) return;
+  const summer = EVENTS.find(e=>e.id==="summer");
+  const active = summer && isEventActive(summer);
+  btn.disabled = !active;
+  btn.title = active ? "" : "Only available during the Summer Event (Jun 1 – Aug 31)";
+}
+
+function slotId(){ return Date.now()+"-"+Math.random().toString(36).slice(2); }
+// Separate ever-increasing counter for slot labels, so "Progress N" numbers stay unique even
+// after slots are deleted or swapped (labeling by array length/position can collide).
+const SLOT_COUNTER_KEY = "battleAntsSlotCounter_v1";
+function nextSlotLabel(){
+  let n = 1;
+  try { n = (parseInt(localStorage.getItem(SLOT_COUNTER_KEY), 10) || 0) + 1; localStorage.setItem(SLOT_COUNTER_KEY, String(n)); } catch(e) { /* ignore */ }
+  return `Progress ${n}`;
+}
+function buildProgressPage(){
+  const msgEl = document.getElementById("progressMsg");
+  msgEl.style.display = "none"; msgEl.textContent = "";
+  document.getElementById("activeProgressInfo").textContent =
+    `Current progress: ${computeProgressPercent(collectSaveData())}% toward beating the game`;
+
+  const listWrap = document.getElementById("savedProgressList");
+  listWrap.innerHTML = "";
+  const slots = loadSlots();
+  slots.forEach((slot, idx)=>{
+    const row = document.createElement("div");
+    row.className = "slotRow";
+    const btn = document.createElement("button");
+    btn.className = "startbtn";
+    const pct = computeProgressPercent(slot.data);
+    btn.textContent = `💾 ${slot.label || ("Progress "+(idx+1))} — ${pct}%`;
+    btn.title = "Click to switch to this saved progress · Right-click to rename it";
+    btn.onclick = ()=> swapToSlot(idx);
+    btn.oncontextmenu = (ev)=>{ ev.preventDefault(); renameSlot(idx); };
+    const delBtn = document.createElement("button");
+    delBtn.className = "slotDeleteBtn";
+    delBtn.textContent = "✕";
+    delBtn.title = "Delete this saved progress";
+    delBtn.onclick = ()=> deleteSlot(idx);
+    row.appendChild(btn); row.appendChild(delBtn);
+    listWrap.appendChild(row);
+  });
+
+  document.getElementById("newProgressBtn").onclick = ()=>{
+    const slots2 = loadSlots();
+    if (slots2.length >= MAX_SLOTS){
+      msgEl.textContent = `⚠️ You already have ${MAX_SLOTS} saved progresses — delete one before starting a new one.`;
+      msgEl.style.display = "block";
+      return;
+    }
+    const pct = computeProgressPercent(collectSaveData());
+    slots2.push({ id: slotId(), label: nextSlotLabel(), savedAt: Date.now(), data: collectSaveData() });
+    saveSlots(slots2);
+    resetLiveStateToDefaults();
+    saveProgress();
+    updateCoinHud();
+    buildHomeShop();
+    buildProgressPage();
+    const freshMsg = document.getElementById("progressMsg");
+    freshMsg.textContent = `🆕 Started a fresh progress! Your previous progress (${pct}%) was saved above.`;
+    freshMsg.style.display = "block";
+  };
+}
+// Renaming uses its own in-page modal (#renameOverlay) rather than the browser's native
+// window.prompt() — prompt() isn't reliably supported inside every desktop-app webview, and on
+// environments where it silently no-ops/returns the same cached value, every "rename" ended up
+// applying the same text to whichever slot was open, making it look like every progress got
+// renamed to the same thing. The modal is fully self-contained so each rename can only ever
+// target the one slot index it was opened for.
+let renameSlotIdx = null;
+function renameSlot(idx){
+  const slots = loadSlots();
+  if (idx<0 || idx>=slots.length) return;
+  renameSlotIdx = idx;
+  const current = slots[idx].label || ("Progress "+(idx+1));
+  const input = document.getElementById("renameInput");
+  input.value = current;
+  document.getElementById("renameOverlay").classList.add("show");
+  input.focus();
+  input.select();
+}
+function closeRenameModal(){
+  document.getElementById("renameOverlay").classList.remove("show");
+  renameSlotIdx = null;
+}
+function confirmRename(){
+  if (renameSlotIdx === null) return;
+  const idx = renameSlotIdx;
+  const slots = loadSlots();
+  if (idx<0 || idx>=slots.length){ closeRenameModal(); return; }
+  const trimmed = document.getElementById("renameInput").value.trim().slice(0, 40);
+  if (trimmed){ // empty input cancels the rename and keeps the old name
+    slots[idx].label = trimmed;
+    saveSlots(slots);
+  }
+  closeRenameModal();
+  buildProgressPage();
+}
+function swapToSlot(idx){
+  const slots = loadSlots();
+  if (idx<0 || idx>=slots.length) return;
+  const slot = slots[idx];
+  // Keep whatever name this slot already has (including one the player set with a right-click
+  // rename) — swapping only exchanges the save DATA between "live" and this slot, it shouldn't
+  // reset the slot's name back to an auto-generated "Progress N".
+  slots[idx] = { id: slotId(), label: slot.label || nextSlotLabel(), savedAt: Date.now(), data: collectSaveData() };
+  saveSlots(slots);
+  applySaveData(slot.data);
+  saveProgress();
+  updateCoinHud();
+  buildHomeShop();
+  buildProgressPage();
+}
+function deleteSlot(idx){
+  const slots = loadSlots();
+  if (idx<0 || idx>=slots.length) return;
+  slots.splice(idx,1);
+  saveSlots(slots);
+  buildProgressPage();
+}
+
+function buildHomeShop(){
+  const wrap = document.getElementById("homeShop");
+  wrap.innerHTML = "";
+  ANT_LINES.forEach(line=>{
+    // locked line: show a single "unlock this line" card until its Lv.20 prereq is met
+    // (previous line in the roster reached Lv.20 — or, for the Queen line, every other line)
+    // AND it's bought with Ant Coins.
+    if (!lineUnlocked[line.id]){
+      const prereq = linePrereq(line.id);
+      const isRareLine = RARE_SLOT_LINE_IDS.includes(line.id);
+      const card = document.createElement("div");
+      card.className = "card" + (line.zombie?" zombie":"");
+      if (line.giftOnly){
+        // gift-only line: no Ant Coin purchase, no slot spins — only claimable from its own
+        // event's login gift (Summer Ant: Summer Event daily gift, day 45).
+        card.innerHTML = `
+          <div class="cname">🔒 ${line.stages[0].n}</div>
+          <div class="nextcost">🎁 Only unlockable by claiming Day 45 of the Summer Event's daily gift</div>`;
+        wrap.appendChild(card);
+        return;
+      }
+      if (isRareLine){
+        // gacha-only line: no Ant Coin purchase — only winnable from the Rare Ant Slots.
+        card.innerHTML = `
+          <div class="cname">🔒 ${line.stages[0].n}</div>
+          ${prereq ? `<div class="nextcost">${prereq.met?"✅":"🔒"} ${prereq.text}</div>` : ""}
+          <div class="nextcost">🎰✨ Only unlockable by winning it in the Rare Ant Slots</div>`;
+        wrap.appendChild(card);
+        return;
+      }
+      const canAffordCoins = antCoins >= line.unlockCost;
+      const canUnlock = (!prereq || prereq.met) && canAffordCoins;
+      card.innerHTML = `
+        <div class="cname">🔒 ${line.stages[0].n}</div>
+        ${prereq ? `<div class="nextcost">${prereq.met?"✅":"🔒"} ${prereq.text}</div>` : ""}
+        <div class="row"><button class="spawn" ${canUnlock?"":"disabled"} data-unlockline>Unlock line · ${fmt(line.unlockCost)} 🪙</button></div>`;
+      wrap.appendChild(card);
+      if (canUnlock){
+        card.querySelector("[data-unlockline]").onclick=()=>{
+          if (antCoins < line.unlockCost){ flashCoins(); return; }
+          antCoins -= line.unlockCost; lineUnlocked[line.id] = true;
+          updateCoinHud(); buildHomeShop();
+        };
+      }
+      return;
+    }
+
+    // already unlocked: levels carry over between battles — you can spend XP in-battle, or
+    // spend Ant Coins right here to level up without playing at all.
+    const maxLvl = maxLevelFor(line);
+    const curLvl = homeUnlocked[line.id] || 1;
+    const atMax = curLvl >= maxLvl;
+    const milestoneTxt = levelMilestone[line.id] ? " · Lv.20 milestone reached" : "";
+    const coinCost = atMax ? 0 : coinCostForLevel(line, curLvl);
+    const isEquipped = equipped.has(line.id);
+    const card = document.createElement("div");
+    card.className = "card" + (line.zombie?" zombie":"");
+    card.innerHTML = `
+      <div class="cname">${line.stages[0].n}</div>
+      <div class="nextcost">Lv.${curLvl} / ${maxLvl} — levels carry over between battles${milestoneTxt}</div>
+      <div class="row"><button class="spawn" ${atMax?"disabled":""} data-levelup>${atMax ? "MAX LEVEL" : `⬆ Lv.${curLvl+1} · ${fmt(coinCost)} 🪙`}</button></div>
+      <div class="row"><button class="equipbtn ${isEquipped?'equipped':''}" data-equip>${isEquipped ? "✓ Equipped" : "Equip"}</button></div>`;
+    wrap.appendChild(card);
+    if (!atMax){
+      card.querySelector("[data-levelup]").onclick=()=>{
+        if (antCoins < coinCost){ flashCoins(); return; }
+        antCoins -= coinCost;
+        grantLevelUp(line);
+        updateCoinHud();
+        if (antCardRefreshers[line.id]) antCardRefreshers[line.id]();
+        buildHomeShop();
+      };
+    }
+    card.querySelector("[data-equip]").onclick=()=>{
+      if (equipped.has(line.id)){
+        equipped.delete(line.id);
+      } else {
+        if (equipped.size >= MAX_EQUIPPED){ flashEquipBar(); return; }
+        equipped.add(line.id);
+      }
+      saveProgress();
+      buildHomeShop();
+    };
+  });
+  buildEquipBar();
+  buildMoneyCapCard();
+  buildIncomeCard();
+  buildBaseHpCard();
+  buildCannonDmgCard();
+  buildCannonRechargeCard();
+}
+function buildEquipBar(){
+  const bar = document.getElementById("equipBar");
+  const slots = [];
+  ANT_LINES.forEach(line=>{ if (equipped.has(line.id)) slots.push(line); });
+  let html = "";
+  for (let i=0;i<MAX_EQUIPPED;i++){
+    const line = slots[i];
+    html += line
+      ? `<div class="equipslot filled">${line.stages[0].n.replace(" ant","").replace("Ant","")}</div>`
+      : `<div class="equipslot"></div>`;
+  }
+  bar.innerHTML = html;
+  document.getElementById("equipCount").textContent = `${equipped.size} / ${MAX_EQUIPPED} equipped`;
+}
+function flashEquipBar(){
+  const bar = document.getElementById("equipBar");
+  bar.classList.add("flash"); setTimeout(()=>bar.classList.remove("flash"), 260);
+}
+function buildMoneyCapCard(){
+  const el = document.getElementById("moneyCapCard");
+  if (!el) return;
+  const atMax = moneyCapLevel >= MONEY_CAP_MAX_LEVEL;
+  const cap = moneyCapFor(moneyCapLevel);
+  const cost = atMax ? 0 : moneyCapCost(moneyCapLevel);
+  const nextCap = atMax ? 0 : moneyCapFor(moneyCapLevel+1);
+  el.innerHTML = `
+    <div class="cname">💰 Money Capacity — Lv.${moneyCapLevel}${atMax?" (MAX)":""}</div>
+    <div class="cstats"><span class="chp">Holds up to ${fmt(cap)}¢</span></div>
+    <div class="row"><button class="spawn" ${atMax?"disabled":""} data-buy>${atMax ? "MAX LEVEL" : `Lv.${moneyCapLevel+1}: ${fmt(nextCap)}¢ · ${fmt(cost)} 🪙`}</button></div>`;
+  if (!atMax){
+    el.querySelector("[data-buy]").onclick=()=>{
+      if (antCoins < cost){ flashCoins(); return; }
+      antCoins -= cost; moneyCapLevel++;
+      updateCoinHud(); buildMoneyCapCard();
+    };
+  }
+}
+function buildIncomeCard(){
+  const el = document.getElementById("incomeCard");
+  if (!el) return;
+  const atMax = incomeLevel >= INCOME_MAX_LEVEL;
+  const cur = INCOME_LEVELS[incomeLevel];
+  const next = atMax ? null : INCOME_LEVELS[incomeLevel+1];
+  const cost = atMax ? 0 : incomeCost(incomeLevel);
+  el.innerHTML = `
+    <div class="cname">⚡ Income Rate — Lv.${incomeLevel}${atMax?" (MAX)":""}</div>
+    <div class="cstats"><span class="cdmg">+${fmt(cur.amt)}¢ every ${(cur.ms/1000).toFixed(1)}s</span></div>
+    <div class="row"><button class="spawn" ${atMax?"disabled":""} data-buy>${atMax ? "MAX LEVEL" : `Lv.${incomeLevel+1}: +${fmt(next.amt)}¢/${(next.ms/1000).toFixed(1)}s · ${fmt(cost)} 🪙`}</button></div>`;
+  if (!atMax){
+    el.querySelector("[data-buy]").onclick=()=>{
+      if (antCoins < cost){ flashCoins(); return; }
+      antCoins -= cost; incomeLevel++;
+      updateCoinHud(); buildIncomeCard();
+    };
+  }
+}
+function buildBaseHpCard(){
+  const el = document.getElementById("baseHpCard");
+  if (!el) return;
+  const atMax = baseHpLevel >= BASE_HP_MAX_LEVEL;
+  const cur = baseHpFor(baseHpLevel);
+  const next = atMax ? 0 : baseHpFor(baseHpLevel+1);
+  const cost = atMax ? 0 : baseHpCost(baseHpLevel);
+  el.innerHTML = `
+    <div class="cname">🛡️ Base HP — Lv.${baseHpLevel}${atMax?" (MAX)":""}</div>
+    <div class="cstats"><span class="chp">${fmt(cur)} HP</span></div>
+    <div class="row"><button class="spawn" ${atMax?"disabled":""} data-buy>${atMax ? "MAX LEVEL" : `Lv.${baseHpLevel+1}: ${fmt(next)} HP · ${fmt(cost)} 🪙`}</button></div>`;
+  if (!atMax){
+    el.querySelector("[data-buy]").onclick=()=>{
+      if (antCoins < cost){ flashCoins(); return; }
+      antCoins -= cost; baseHpLevel++;
+      updateCoinHud(); buildBaseHpCard();
+    };
+  }
+}
+function buildCannonDmgCard(){
+  const el = document.getElementById("cannonDmgCard");
+  if (!el) return;
+  const atMax = cannonDmgLevel >= CANNON_DMG_MAX_LEVEL;
+  const cur = cannonDmgFor(cannonDmgLevel);
+  const next = atMax ? 0 : cannonDmgFor(cannonDmgLevel+1);
+  const cost = atMax ? 0 : cannonDmgCost(cannonDmgLevel);
+  el.innerHTML = `
+    <div class="cname">🔫 Cannon Damage — Lv.${cannonDmgLevel}${atMax?" (MAX)":""}</div>
+    <div class="cstats"><span class="cdmg">${fmt(cur)} DMG</span></div>
+    <div class="row"><button class="spawn" ${atMax?"disabled":""} data-buy>${atMax ? "MAX LEVEL" : `Lv.${cannonDmgLevel+1}: ${fmt(next)} DMG · ${fmt(cost)} 🪙`}</button></div>`;
+  if (!atMax){
+    el.querySelector("[data-buy]").onclick=()=>{
+      if (antCoins < cost){ flashCoins(); return; }
+      antCoins -= cost; cannonDmgLevel++;
+      updateCoinHud(); buildCannonDmgCard();
+    };
+  }
+}
+function buildCannonRechargeCard(){
+  const el = document.getElementById("cannonRechargeCard");
+  if (!el) return;
+  const atMax = cannonRechargeLevel >= CANNON_RECHARGE_MAX_LEVEL;
+  const cur = cannonCooldownFor(cannonRechargeLevel);
+  const next = atMax ? 0 : cannonCooldownFor(cannonRechargeLevel+1);
+  const cost = atMax ? 0 : cannonRechargeCost(cannonRechargeLevel);
+  el.innerHTML = `
+    <div class="cname">⏱️ Cannon Recharge — Lv.${cannonRechargeLevel}${atMax?" (MAX)":""}</div>
+    <div class="cstats"><span class="chp">${cur}s reload</span></div>
+    <div class="row"><button class="spawn" ${atMax?"disabled":""} data-buy>${atMax ? "MAX LEVEL" : `Lv.${cannonRechargeLevel+1}: ${next}s · ${fmt(cost)} 🪙`}</button></div>`;
+  if (!atMax){
+    el.querySelector("[data-buy]").onclick=()=>{
+      if (antCoins < cost){ flashCoins(); return; }
+      antCoins -= cost; cannonRechargeLevel++;
+      updateCoinHud(); buildCannonRechargeCard();
+    };
+  }
+}
+function updateGameCardVisibility(){
+  ANT_LINES.forEach(line=>{
+    const el = antCardEls[line.id];
+    if (el) el.style.display = equipped.has(line.id) ? "" : "none";
+  });
+}
+
+function startRun(){
+  if (!allRoundsCleared()) return; // locked until every Battle Selection round is cleared
+  // reset run currencies & board
+  money = 100; xp = 0;
+  incomeAccumMs = 0; gameClock = 0;
+  ngPlusLoop = 0;
+  endlessKillCount = 0;
+  for (const e of entities){ if (e.el) e.el.remove(); }
+  entities = [];
+  // leftover rapid-spawn toggles from the last run shouldn't carry into a fresh one
+  autoSpawnLines.clear();
+  document.querySelectorAll(".cart.autospawning").forEach(el=>el.classList.remove("autospawning"));
+  ANT_LINES.forEach(line=>{
+    antUnlocked[line.id] = homeUnlocked[line.id] || 1; // levels are permanent — carry over between runs
+    antState[line.id] = homeUnlocked[line.id] || 1;
+    if (antCardRefreshers[line.id]) antCardRefreshers[line.id]();
+  });
+  updateGameCardVisibility();
+  clearInterval(cannonIntervalId);
+  cannonReady = true;
+  const cbtn = document.getElementById("cannonBtn");
+  cbtn.disabled = false; cbtn.textContent = "🔫 Fire Cannon";
+  paused = false;
+  document.getElementById("pauseOverlay").classList.remove("show");
+  document.getElementById("pauseBtn").disabled = false;
+  spawnBase();
+  waveState.stage=1; waveState.wave=1; waveState.queue=[]; waveState.spawnedCount=0; waveState.spawning=false;
+  updateMoney(); updateXP(); updateCounts(); updateWaveHud();
+  runActive = true;
+  showGame();
+  startWave(1,1);
+}
+
+function startRound(roundDef){
+  const idx = ROUNDS.findIndex(r=>r.id===roundDef.id);
+  if (idx > 0 && !roundsCleared[ROUNDS[idx-1].id]) return; // locked — beat the previous round first
+  // reset run currencies & board
+  money = 100; xp = 0;
+  incomeAccumMs = 0; gameClock = 0;
+  ngPlusLoop = 0;
+  roundKillCount = 0;
+  for (const e of entities){ if (e.el) e.el.remove(); }
+  entities = [];
+  autoSpawnLines.clear();
+  document.querySelectorAll(".cart.autospawning").forEach(el=>el.classList.remove("autospawning"));
+  ANT_LINES.forEach(line=>{
+    antUnlocked[line.id] = homeUnlocked[line.id] || 1; // levels are permanent — carry over between runs
+    antState[line.id] = homeUnlocked[line.id] || 1;
+    if (antCardRefreshers[line.id]) antCardRefreshers[line.id]();
+  });
+  updateGameCardVisibility();
+  clearInterval(cannonIntervalId);
+  cannonReady = true;
+  const cbtn = document.getElementById("cannonBtn");
+  cbtn.disabled = false; cbtn.textContent = "🔫 Fire Cannon";
+  paused = false;
+  document.getElementById("pauseOverlay").classList.remove("show");
+  document.getElementById("pauseBtn").disabled = false;
+  spawnBase();
+  spawnBugBase(roundDef.bugBaseHp);
+  const tickSeasonNow = isTickSeasonActive();
+  // Tick Season overrides a round's normal roster entirely, so its one-time bonus spawns
+  // (e.g. Indiana's ant eater) sit out too — only ticks appear while the season is active.
+  if (roundDef.oneTimeSpawns && !tickSeasonNow){
+    roundDef.oneTimeSpawns.forEach(id=>{
+      const def = BUG_BY_ID[id];
+      if (!def) return;
+      setTimeout(()=>{
+        if (!runActive || currentRoundId !== roundDef.id) return;
+        spawnBug(def, 1);
+      }, 1500);
+    });
+  }
+  // Tick Bushes: only while Tick Season is active, and only on rounds from the 11th onward —
+  // exactly 5 per round, placed at random spots across the field (a different layout every time
+  // the round is (re)started), never respawned once destroyed or once the round begins.
+  if (tickSeasonNow && idx >= 10){
+    for (let i=0;i<5;i++) spawnTickBush();
+  }
+  waveState.stage=1; waveState.wave=1; waveState.queue=[]; waveState.spawnedCount=0; waveState.spawning=false;
+  updateMoney(); updateXP(); updateCounts();
+  document.getElementById("waveHud").textContent = `${roundDef.emoji} ${roundDef.name} · destroy the bug base!`;
+  runActive = true;
+  currentRoundId = roundDef.id;
+  showGame();
+  clearTimeout(texasSpawnInterval);
+  const spawnPool = (tickSeasonNow ? TICK_BUG_IDS : (roundDef.bugPool || ["termite"])).map(id=>BUG_BY_ID[id]).filter(Boolean);
+  const scheduleRoundSpawn = ()=>{
+    if (!runActive || currentRoundId !== roundDef.id) return;
+    const wait = tickSeasonNow ? 1000 : (roundDef.spawnMsMin != null
+      ? roundDef.spawnMsMin + Math.random()*(roundDef.spawnMsMax - roundDef.spawnMsMin)
+      : roundDef.spawnMs);
+    texasSpawnInterval = setTimeout(()=>{
+      if (!runActive || currentRoundId !== roundDef.id) return;
+      if (!paused && spawnPool.length){
+        const def = spawnPool[Math.floor(Math.random()*spawnPool.length)];
+        spawnBug(def, 1);
+      }
+      scheduleRoundSpawn();
+    }, wait);
+  };
+  scheduleRoundSpawn();
+}
+
+function endRun(coinsEarned, msg){
+  runActive = false;
+  currentRoundId = null;
+  clearTimeout(texasSpawnInterval);
+  antCoins += coinsEarned;
+  updateCoinHud();
+  autoSpawnLines.clear();
+  document.querySelectorAll(".cart.autospawning").forEach(el=>el.classList.remove("autospawning"));
+  document.getElementById("cannonBtn").disabled = true;
+  paused = false;
+  document.getElementById("pauseOverlay").classList.remove("show");
+  document.getElementById("pauseBtn").disabled = true;
+  const msgEl = document.getElementById("homeMsg");
+  msgEl.textContent = msg;
+  msgEl.style.display = "block";
+  buildHomeShop();
+  showBattlePrep();
+}
+function winRun(){
+  // Clearing the final stage no longer ends the run — it loops the simulation back to Stage 1
+  // (keeping your money, XP, and ants on the field) with every bug 1.5x tougher than last loop.
+  const bonus = 1000 + Math.floor(money/10); // +1 Ant Coin per 10¢ you have right now
+  antCoins += bonus; updateCoinHud();
+  ngPlusLoop++;
+  if (ngPlusLoop > bestLoopReached){ bestLoopReached = ngPlusLoop; saveProgress(); }
+  const mult = bugDifficultyMult();
+  showBanner(`🔁 LOOP ${ngPlusLoop+1} · BUGS ${mult.toFixed(2)}×`, "bug");
+  floatText(FIELD_W/2, 60, `+${fmt(bonus)} 🪙 — simulation restarting…`);
+  waveState.queue = [];
+  setTimeout(()=>startWave(1,1), 1500/gameSpeed);
+}
+// Looks a round id up across both round lists — a currentRoundId can belong to either the main
+// state-rounds chain (ROUNDS) or the Summer Stages list (SUMMER_ROUNDS), which are otherwise
+// treated identically by startRound/winRound/loseRun.
+function findRoundDef(id){ return ROUNDS.find(r=>r.id===id) || SUMMER_ROUNDS.find(r=>r.id===id); }
+function loseRun(){
+  const roundDef = findRoundDef(currentRoundId);
+  const coins = roundDef ? Math.floor(money/10) : waveState.stage*30 + Math.floor(money/10); // +1 Ant Coin per 10¢ you finished with
+  const msg = roundDef
+    ? `💥 Your base was overrun during the ${roundDef.name} round! +${fmt(coins)} Ant Coins for your progress.`
+    : `💥 Base destroyed at Stage ${waveState.stage}! +${fmt(coins)} Ant Coins for your progress.`;
+  endRun(coins, msg);
+}
+function winRound(){
+  const roundDef = findRoundDef(currentRoundId);
+  if (!roundDef){ endRun(0, "Round cleared."); return; }
+  const firstClear = !roundsCleared[roundDef.id];
+  roundsCleared[roundDef.id] = true;
+  // Ant Slots / Rare Ant Slots unlock the first time Virginia is cleared, along with a one-time
+  // starter spin for each — clearing Virginia again afterward grants no extra spins (the only
+  // repeatable way to earn spins is killing 100 bugs in Endless Battle).
+  let coins = 500 + Math.floor(money/10);
+  let msg = `${roundDef.emoji} ${roundDef.name} cleared — bug base destroyed! +${fmt(coins)} Ant Coins.`;
+  if (firstClear && roundDef.id === "virginia"){
+    antSlotsUnlocked = true;
+    antSlotSpins += 1;
+    rareAntSlotSpins += 1;
+    updateAntSlotsVisibility();
+    updateSlotSpinCounters();
+    msg += " Ant Slots unlocked — +1 🎰 Ant Slot spin and +1 🎰✨ Rare Ant Slot spin!";
+  }
+  endRun(coins, msg);
+  saveProgress();
+}
+
+document.getElementById("playBtn").onclick = showBattlePrep;
+document.getElementById("equipBtn").onclick = showHome;
+document.getElementById("battleBtn").onclick = showStageSelection;
+document.getElementById("stateStagesBtn").onclick = showBattleSelection;
+document.getElementById("summerStagesBtn").onclick = showSummerStageSelection;
+document.getElementById("backFromStageSelectionBtn").onclick = showBattlePrep;
+document.getElementById("backFromSummerStageSelectionBtn").onclick = showStageSelection;
+document.getElementById("endlessBtn").onclick = startRun;
+document.getElementById("backToPrepBtn").onclick = showBattlePrep;
+document.getElementById("backToHomePageBtn").onclick = showHomePage;
+document.getElementById("backFromSelectionBtn").onclick = showStageSelection;
+document.getElementById("settingsBtn").onclick = showSettings;
+document.getElementById("backFromSettingsBtn").onclick = showHomePage;
+document.getElementById("progressBtn").onclick = showProgress;
+document.getElementById("backFromProgressBtn").onclick = showSettings;
+document.getElementById("soundBtn").onclick = ()=>{
+  soundMuted = !soundMuted;
+  document.getElementById("soundBtn").textContent = soundMuted ? "🔇 Sound: Off" : "🔊 Sound: On";
+  saveProgress();
+};
+document.getElementById("antSlotsBtn").onclick = showAntSlots;
+document.getElementById("rareAntSlotsBtn").onclick = showRareAntSlots;
+document.getElementById("spinAntSlotsBtn").onclick = spinAntSlots;
+document.getElementById("spinRareAntSlotsBtn").onclick = spinRareAntSlots;
+document.getElementById("spin10AntSlotsBtn").onclick = spinAntSlotsX10;
+document.getElementById("spin10RareAntSlotsBtn").onclick = spinRareAntSlotsX10;
+document.getElementById("backFromAntSlotsBtn").onclick = showBattlePrep;
+document.getElementById("backFromRareAntSlotsBtn").onclick = showBattlePrep;
+document.getElementById("storageBtn").onclick = showStorage;
+document.getElementById("backFromStorageBtn").onclick = showBattlePrep;
+document.getElementById("renameConfirmBtn").onclick = confirmRename;
+document.getElementById("renameCancelBtn").onclick = closeRenameModal;
+document.getElementById("renameInput").addEventListener("keydown", (ev)=>{
+  if (ev.key === "Enter"){ ev.preventDefault(); confirmRename(); }
+  else if (ev.key === "Escape"){ ev.preventDefault(); closeRenameModal(); }
+});
+
+loadProgress();
+document.getElementById("soundBtn").textContent = soundMuted ? "🔇 Sound: Off" : "🔊 Sound: On";
+updateAntSlotsVisibility();
+updateSlotSpinCounters();
+updateEndlessLockUI();
+buildAntCards();
+buildBugCards();
+buildHomeShop();
+updateMoney();
+updateXP();
+updateCoinHud();
+updateCounts();
+updateWaveHud();
+requestAnimationFrame(tick);
+checkSummerGift();
+showHomePage();
+</script>
+</body>
+</html>
